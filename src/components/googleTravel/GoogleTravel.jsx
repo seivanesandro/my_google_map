@@ -282,6 +282,10 @@ const GoogleTravel = () => {
         }
     }, [mapInitialized]);
 
+     const refreshPage = useCallback(() => {
+         window.location.reload();
+     }, []);
+
     const handleLocationError = (browserHasGeolocation, pos) => {
         // Implementar lógica de erro de geolocalização aqui
     };
@@ -413,6 +417,9 @@ const GoogleTravel = () => {
                         onClick={speakDirections}
                     >
                         Ler Instruções
+                    </button>
+                    <button onClick={refreshPage}>
+                        Atualizar Página
                     </button>
                 </ContainerBtns>
             </ContainerFormStyle>
