@@ -24,7 +24,7 @@ const Scale = keyframes`
 `;
 
 const ContainerGoogleMaps = styled.div`
-    margin: 13rem auto !important;
+    margin: 7rem auto !important;
     animation: ${Show} 1.5s ease-in;
 
     @media only screen and (${devices.tablet}) {
