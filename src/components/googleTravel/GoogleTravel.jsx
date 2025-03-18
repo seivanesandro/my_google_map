@@ -413,12 +413,12 @@ const GoogleTravel = () => {
                         Calcular Rota
                     </button>
                     <button
-                        className="btn btn-success d-grid gap-2 d-lg-block"
+                        className="btn btn-info d-grid gap-2 d-lg-block"
                         onClick={speakDirections}
                     >
                         Ler Instruções
                     </button>
-                    <button onClick={refreshPage}>
+                    <button onClick={refreshPage} className='btn btn-danger d-grid gap-2 d-lg-block'>
                         Atualizar Página
                     </button>
                 </ContainerBtns>
