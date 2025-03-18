@@ -190,7 +190,8 @@ const ContainerBtns = styled.div`
 let googleMapsScriptLoaded = false;
 
 const GoogleTravel = () => {
-    const mapRef = useRef(null);
+    
+   const mapRef = useRef(null);
     const directionsPanelRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const directionsRendererRef = useRef(null);
@@ -211,80 +212,49 @@ const GoogleTravel = () => {
     const initMap = useCallback(() => {
         if (!mapRef.current) return;
 
-        mapInstanceRef.current =
-            new window.google.maps.Map(
-                mapRef.current,
-                {
-                    center: { lat: 0, lng: 0 },
-                    zoom: 15
-                }
-            );
+        mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+            center: { lat: 0, lng: 0 },
+            zoom: 15,
+        });
 
-        directionsServiceRef.current =
-            new window.google.maps.DirectionsService();
-        directionsRendererRef.current =
-            new window.google.maps.DirectionsRenderer(
-                {
-                    map: mapInstanceRef.current,
-                    panel: directionsPanelRef.current
-                }
-            );
+        directionsServiceRef.current = new window.google.maps.DirectionsService();
+        directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
+            map: mapInstanceRef.current,
+            panel: directionsPanelRef.current,
+        });
 
-        trafficLayerRef.current =
-            new window.google.maps.TrafficLayer();
-        trafficLayerRef.current.setMap(
-            mapInstanceRef.current
+        trafficLayerRef.current = new window.google.maps.TrafficLayer();
+        trafficLayerRef.current.setMap(mapInstanceRef.current);
+
+        watchIdRef.current = navigator.geolocation.watchPosition(
+            (position) => {
+                const pos = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                };
+                setUserPosition(pos);
+                if (userMarkerRef.current) {
+                    userMarkerRef.current.setPosition(pos);
+                } else {
+                    userMarkerRef.current = new window.google.maps.Marker({
+                        position: pos,
+                        map: mapInstanceRef.current,
+                    });
+                }
+                if (!mapInitialized) {
+                    mapInstanceRef.current.setCenter(pos);
+                    setMapInitialized(true);
+                }
+            },
+            () => {
+                handleLocationError(true, mapInstanceRef.current.getCenter());
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 0,
+            }
         );
-
-        if (navigator.geolocation) {
-            watchIdRef.current =
-                navigator.geolocation.watchPosition(
-                    position => {
-                        const pos = {
-                            lat: position.coords
-                                .latitude,
-                            lng: position.coords
-                                .longitude
-                        };
-                        setUserPosition(pos);
-                        if (
-                            userMarkerRef.current
-                        ) {
-                            userMarkerRef.current.setPosition(
-                                pos
-                            );
-                        } else {
-                            userMarkerRef.current =
-                                new window.google.maps.Marker(
-                                    {
-                                        position:
-                                            pos,
-                                        map: mapInstanceRef.current
-                                    }
-                                );
-                        }
-                        if (!mapInitialized) {
-                            mapInstanceRef.current.setCenter(
-                                pos
-                            );
-                            setMapInitialized(
-                                true
-                            );
-                        }
-                    },
-                    () => {
-                        handleLocationError(
-                            true,
-                            mapInstanceRef.current.getCenter()
-                        );
-                    }
-                );
-        } else {
-            handleLocationError(
-                false,
-                mapInstanceRef.current.getCenter()
-            );
-        }
     }, [mapInitialized]);
 
      const refreshPage = useCallback(() => {
@@ -292,7 +262,15 @@ const GoogleTravel = () => {
      }, []);
 
     const handleLocationError = (browserHasGeolocation, pos) => {
-        // Implementar lógica de erro de geolocalização aqui
+        if (browserHasGeolocation) {
+            alert(
+                'Erro: O serviço de geolocalização falhou.'
+            );
+        } else {
+            alert(
+                'Erro: O seu navegador não suporta geolocalização.'
+            );
+        }
     };
 
     const calculateRoute = useCallback(() => {
@@ -331,7 +309,8 @@ const GoogleTravel = () => {
 
     useEffect(() => {
         if (!googleMapsScriptLoaded) {
-            const script = document.createElement('script');
+            const script =
+                document.createElement('script');
             script.src = `${apiGoogleMapURL}?key=${apiGoogleMapKey}&libraries=places`;
             script.onload = () => {
                 googleMapsScriptLoaded = true;
@@ -344,16 +323,17 @@ const GoogleTravel = () => {
 
         return () => {
             if (watchIdRef.current) {
-                navigator.geolocation.clearWatch(watchIdRef.current);
+                navigator.geolocation.clearWatch(
+                    watchIdRef.current
+                );
             }
         };
-    }, [apiGoogleMapKey, apiGoogleMapURL, initMap, mapInitialized]);
-
-
-
-
-
-
+    }, [
+        apiGoogleMapKey,
+        apiGoogleMapURL,
+        initMap,
+        mapInitialized
+    ]);
 
 
     return (
