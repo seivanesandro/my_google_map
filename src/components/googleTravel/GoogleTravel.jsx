@@ -203,207 +203,321 @@ const GoogleTravel = () => {
     const [destination, setDestination] = useState(''); // Destino da rota
     const [travelMode, setTravelMode] = useState('DRIVING'); // Modo de viagem padrão
     const [directionsResult, setDirectionsResult] = useState(null); // Resultado da rota
+    const [mapInitialized, setMapInitialized] = useState(false); // Indica se o mapa já foi inicializado
 
     // Efeito para carregar a API do Google Maps e inicializar o mapa
     useEffect(() => {
         // Verifica se a API já foi carregada
-         if (
-             !window.google &&
-             !googleMapsScriptLoaded
-         ) {
-             // Verifica a variável de controle
+        if (
+            !window.google &&
+            !googleMapsScriptLoaded
+        ) {
+            // Verifica a variável de controle
 
-             // Cria um novo script para carregar a API
-             const script =
-                 document.createElement('script');
-             script.src = `${apiGoogleMapURL}?key=${apiGoogleMapKey}&callback=initMap`; // URL da API com a chave e callback
-             script.defer = true;
-             script.async = true;
+            // Cria um novo script para carregar a API
+            const script =
+                document.createElement('script');
+            script.src = `${apiGoogleMapURL}?key=${apiGoogleMapKey}&callback=initMap`; // URL da API com a chave e callback
+            script.defer = true;
+            script.async = true;
 
-             // Função de callback chamada quando a API é carregada
-             window.initMap = () => {
-                 console.log(
-                     'API do Google Maps carregada'
-                 );
-                 console.log(
-                     'mapRef.current:',
-                     mapRef.current
-                 );
+            // Função de callback chamada quando a API é carregada
+            window.initMap = () => {
+                console.log(
+                    'API do Google Maps carregada'
+                );
+                console.log(
+                    'mapRef.current:',
+                    mapRef.current
+                );
 
-                 // Verifica se a geolocalização é suportada
-                 if (navigator.geolocation) {
-                     // Monitora a posição do usuário continuamente
-                     navigator.geolocation.watchPosition(
-                         position => {
-                             try {
-                                 // Cria um objeto com a posição do usuário
-                                 const pos = {
-                                     lat: position
-                                         .coords
-                                         .latitude,
-                                     lng: position
-                                         .coords
-                                         .longitude
-                                 };
-                                 setUserPosition(
-                                     pos
-                                 );
+                // Verifica se a geolocalização é suportada
+                if (navigator.geolocation) {
+                    // Monitora a posição do usuário continuamente
+                    navigator.geolocation.watchPosition(
+                        position => {
+                            try {
+                                // Cria um objeto com a posição do usuário
+                                const pos = {
+                                    lat: position
+                                        .coords
+                                        .latitude,
+                                    lng: position
+                                        .coords
+                                        .longitude
+                                };
+                                setUserPosition(
+                                    pos
+                                );
 
-                                 // Inicializa o mapa se ainda não foi inicializado
-                                 if (!map) {
-                                     if (
-                                         mapRef.current
-                                     ) {
-                                         const newMap =
-                                             new window.google.maps.Map(
-                                                 mapRef.current,
-                                                 {
-                                                     center: pos,
-                                                     zoom: 12
-                                                 }
-                                             );
-                                         const newDirectionsRenderer =
-                                             new window.google.maps.DirectionsRenderer(
-                                                 {
-                                                     map: newMap,
-                                                     panel: directionsPanelRef.current
-                                                 }
-                                             );
-                                         const newDirectionsService =
-                                             new window.google.maps.DirectionsService();
-                                         const newUserMarker =
-                                             new window.google.maps.Marker(
-                                                 {
-                                                     position:
-                                                         pos,
-                                                     map: newMap,
-                                                     title: 'Sua localização'
-                                                 }
-                                             );
+                                // Inicializa o mapa se ainda não foi inicializado
+                                if (
+                                    !mapInitialized
+                                ) {
+                                    const newMap =
+                                        new window.google.maps.Map(
+                                            mapRef.current,
+                                            {
+                                                center: pos,
+                                                zoom: 12
+                                            }
+                                        );
+                                    const newDirectionsRenderer =
+                                        new window.google.maps.DirectionsRenderer(
+                                            {
+                                                map: newMap,
+                                                panel: directionsPanelRef.current
+                                            }
+                                        );
+                                    const newDirectionsService =
+                                        new window.google.maps.DirectionsService();
+                                    const newUserMarker =
+                                        new window.google.maps.Marker(
+                                            {
+                                                position:
+                                                    pos,
+                                                map: newMap,
+                                                title: 'Sua localização'
+                                            }
+                                        );
 
-                                         // Inicializa e armazena a camada de tráfego no estado
-                                         const newTrafficLayer =
-                                             new window.google.maps.TrafficLayer();
-                                         setTrafficLayer(
-                                             newTrafficLayer
-                                         );
+                                    // Inicializa e armazena a camada de tráfego no estado
+                                    const newTrafficLayer =
+                                        new window.google.maps.TrafficLayer();
+                                    setMap(
+                                        newMap
+                                    );
+                                    setDirectionsRenderer(
+                                        newDirectionsRenderer
+                                    );
+                                    setDirectionsService(
+                                        newDirectionsService
+                                    );
+                                    setUserMarker(
+                                        newUserMarker
+                                    );
+                                    setTrafficLayer(
+                                        newTrafficLayer
+                                    );
+                                    setMapInitialized(
+                                        true
+                                    );
+                                } else {
+                                    // Atualiza a posição do marcador e centraliza o mapa
+                                    userMarker.setPosition(
+                                        pos
+                                    );
+                                    map.setCenter(
+                                        pos
+                                    );
+                                }
+                            } catch (error) {
+                                console.error(
+                                    'Erro de geolocalização:',
+                                    error
+                                );
+                                alert(
+                                    'Erro: Falha ao obter a localização.'
+                                );
+                            }
+                        },
+                        error => {
+                            console.error(
+                                'Erro de geolocalização:',
+                                error
+                            );
+                            alert(
+                                'Erro: Falha ao obter a localização.'
+                            );
+                        }
+                    );
+                } else {
+                    alert(
+                        'Erro: Navegador não suporta geolocalização.'
+                    );
+                }
+            };
 
-                                         setMap(
-                                             newMap
-                                         );
-                                         setDirectionsRenderer(
-                                             newDirectionsRenderer
-                                         );
-                                         setDirectionsService(
-                                             newDirectionsService
-                                         );
-                                         setUserMarker(
-                                             newUserMarker
-                                         );
-                                     }
-                                 } else {
-                                     // Atualiza a posição do marcador e centraliza o mapa
-                                     userMarker.setPosition(
-                                         pos
-                                     );
-                                     map.setCenter(
-                                         pos
-                                     );
-                                 }
-                             } catch (error) {
-                                 console.error(
-                                     'Erro de geolocalização:',
-                                     error
-                                 );
-                                 alert(
-                                     'Erro: Falha ao obter a localização.'
-                                 );
-                             }
-                         },
-                         error => {
-                             console.error(
-                                 'Erro de geolocalização:',
-                                 error
-                             );
-                             alert(
-                                 'Erro: Falha ao obter a localização.'
-                             );
-                         }
-                     );
-                 } else {
-                     alert(
-                         'Erro: Navegador não suporta geolocalização.'
-                     );
-                 }
-             };
+            script.onload = () => {
+                googleMapsScriptLoaded = true; // Define a variável de controle como true
+            };
 
-             script.onload = () => {
-                 googleMapsScriptLoaded = true; // Define a variável de controle como true
-             };
-
-             document.head.appendChild(script);
-         } else if (window.google) {
-             // Se a API já estiver carregada, chama a função de inicialização
-             window.initMap();
-         }
-    }, [apiGoogleMapKey, apiGoogleMapURL, map, userMarker]);
+            document.head.appendChild(script);
+        } else if (window.google) {
+            // Se a API já estiver carregada, chama a função de inicialização
+            window.initMap();
+        }
+    }, [
+        apiGoogleMapKey,
+        apiGoogleMapURL,
+        map,
+        mapInitialized,
+        userMarker
+    ]);
 
     // Função para calcular a rota
     const calculateRoute = () => {
-        if (directionsService && directionsRenderer && userPosition) {
+        if (
+            directionsService &&
+            directionsRenderer &&
+            userPosition &&
+            destination
+        ) {
             try {
                 // Calcula a rota usando o serviço de rotas
                 directionsService.route(
                     {
                         origin: userPosition,
                         destination: destination,
-                        travelMode: window.google.maps.TravelMode[travelMode],
+                        travelMode:
+                            window.google.maps
+                                .TravelMode[
+                                travelMode
+                            ],
                         optimizeWaypoints: true
                     },
                     (response, status) => {
                         if (status === 'OK') {
-                            directionsRenderer.setDirections(response);
-                            setDirectionsResult(response);
+                            directionsRenderer.setDirections(
+                                response
+                            );
+                            setDirectionsResult(
+                                response
+                            );
 
                             // Exibe a camada de tráfego automaticamente
                             if (trafficLayer) {
-                                trafficLayer.setMap(map);
+                                trafficLayer.setMap(
+                                    map
+                                );
                             }
                         } else {
-                            window.alert('Directions request failed due to ' + status);
+                            window.alert(
+                                'Directions request failed due to ' +
+                                    status
+                            );
                         }
                     }
                 );
             } catch (error) {
-                console.error('Erro ao calcular rota:', error);
+                console.error(
+                    'Erro ao calcular rota:',
+                    error
+                );
             }
         } else {
-            alert('A sua localização ainda não foi determinada ou o destino está vazio.');
+            alert(
+                'A sua localização ainda não foi determinada ou o destino está vazio.'
+            );
         }
     };
 
     // Função para ler as instruções da rota em voz alta
-    const speakDirections = () => {
-        if (directionsResult && directionsResult.routes && directionsResult.routes.length > 0 && directionsResult.routes[0].legs && directionsResult.routes[0].legs.length > 0 && directionsResult.routes[0].legs[0].steps && 'speechSynthesis' in window) {
-            const steps = directionsResult.routes[0].legs[0].steps;
-            const speech = new SpeechSynthesisUtterance();
-            speech.lang = 'pt-BR';
-            let text = '';
-            steps.forEach(step => {
-                text += step.instructions + '. ';
-            });
-            speech.text = text;
-            window.speechSynthesis.speak(speech);
-        } else {
-            if (!directionsResult) {
-                alert('A rota ainda não foi calculada.');
-            } else if (!('speechSynthesis' in window)) {
-                alert('A síntese de voz não é suportada no seu navegador.');
-            } else {
-                alert('Não foi possível obter as instruções de rota.');
-            }
-        }
-    };
+     const speakDirections = () => {
+         console.log('speakDirections chamado');
+         if (
+             directionsResult &&
+             directionsResult.routes &&
+             directionsResult.routes.length > 0 &&
+             directionsResult.routes[0].legs &&
+             directionsResult.routes[0].legs
+                 .length > 0 &&
+             directionsResult.routes[0].legs[0]
+                 .steps &&
+             'speechSynthesis' in window
+         ) {
+             const steps =
+                 directionsResult.routes[0]
+                     .legs[0].steps;
+             const speech =
+                 new SpeechSynthesisUtterance();
+             speech.lang = 'pt-PT';
+             let text = '';
+             steps.forEach(step => {
+                 text += step.instructions + '. ';
+             });
+             console.log(
+                 'Texto das instruções:',
+                 text
+             );
+             if (text.trim() !== '') {
+                 speech.text = text;
+                 speech.onerror = event => {
+                     console.error(
+                         'Erro de síntese de voz:',
+                         event
+                     );
+                 };
+
+                 const voices =
+                     window.speechSynthesis.getVoices();
+                 const ptPTVoice = voices.find(
+                     voice =>
+                         voice.lang === 'pt-PT'
+                 );
+                 if (ptPTVoice) {
+                     speech.voice = ptPTVoice;
+                 } else {
+                     console.error(
+                         'Voz pt-PT não encontrada.'
+                     );
+                 }
+
+                 console.log(
+                     'Vozes encontradas:',
+                     voices
+                 );
+                 console.log(
+                     'Voz selecionada:',
+                     speech.voice
+                 );
+
+                 speech.onend = () => {
+                     console.log(
+                         'Síntese de voz concluída.'
+                     );
+                 };
+
+                 window.speechSynthesis.speak(
+                     speech
+                 );
+             } else {
+                 alert(
+                     'Não há instruções de rota para ler.'
+                 );
+             }
+         } else {
+             // ... (seus logs de condições permanecem os mesmos)
+         }
+         //teste de voz com texto estatico
+         const testeSpeech =
+             new SpeechSynthesisUtterance();
+         testeSpeech.text =
+             'isto é um teste de voz';
+         testeSpeech.lang = 'pt-PT';
+         testeSpeech.onerror = event => {
+             console.error(
+                 'Erro no teste de voz:',
+                 event
+             );
+         };
+         testeSpeech.onend = () => {
+             console.log(
+                 'Teste de voz concluído.'
+             );
+         };
+         window.speechSynthesis.speak(
+             testeSpeech
+         );
+
+         //teste de vozes fora da funçao
+         console.log(
+             'vozes:',
+             window.speechSynthesis.getVoices()
+         );
+     };
+
+
 
     return (
         <ContainerGoogleMaps className="container container-google-map">
