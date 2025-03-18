@@ -177,6 +177,11 @@ const ContainerBtns = styled.div`
     @media only screen and (${devices.tablet}) {
         gap: 4rem !important;
     }
+    @media only screen and (${devices.iphone14}) {
+        gap: 1.5rem !important;
+        flex-direction: column !important;
+    }
+
     @media only screen and (${devices.mobileP}) {
         gap: 1rem !important;
     }
@@ -407,18 +412,18 @@ const GoogleTravel = () => {
 
                 <ContainerBtns className="container-btns">
                     <button
-                        className="btn btn-success d-grid gap-2 d-lg-block"
+                        className="btn btn-success d-grid gap-2 d-md-block"
                         onClick={calculateRoute}
                     >
                         Calcular Rota
                     </button>
                     <button
-                        className="btn btn-info d-grid gap-2 d-lg-block"
+                        className="btn btn-info d-grid gap-2 d-md-block"
                         onClick={speakDirections}
                     >
                         Ler Instruções
                     </button>
-                    <button onClick={refreshPage} className='btn btn-danger d-grid gap-2 d-lg-block'>
+                    <button onClick={refreshPage} className='btn btn-danger d-grid gap-2 d-md-block'>
                         Atualizar Página
                     </button>
                 </ContainerBtns>
