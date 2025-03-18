@@ -4,7 +4,7 @@ import GoogleTravel from './components/googleTravel/GoogleTravel';
 function App() {
   return (
       <div className="App">
-          <h1 className='text-center text-light'>My travel Maps</h1>
+          <h1 className='text-center text-light my-5'>My travel Maps</h1>
           <GoogleTravel />
           <Footer />
       </div>

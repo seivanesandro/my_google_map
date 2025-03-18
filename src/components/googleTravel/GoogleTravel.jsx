@@ -24,7 +24,7 @@ const Scale = keyframes`
 `;
 
 const ContainerGoogleMaps = styled.div`
-    margin: 1rem auto !important;
+    margin: 13rem auto !important;
     animation: ${Show} 1.5s ease-in;
 
     @media only screen and (${devices.tablet}) {
@@ -190,7 +190,7 @@ const ContainerBtns = styled.div`
 let googleMapsScriptLoaded = false;
 
 const GoogleTravel = () => {
-    
+
    const mapRef = useRef(null);
     const directionsPanelRef = useRef(null);
     const mapInstanceRef = useRef(null);
@@ -314,11 +314,51 @@ const GoogleTravel = () => {
             script.src = `${apiGoogleMapURL}?key=${apiGoogleMapKey}&libraries=places`;
             script.onload = () => {
                 googleMapsScriptLoaded = true;
-                initMap();
+                if (
+                    window.google &&
+                    window.google.maps
+                ) {
+                    // Verificação adicional do carregamento completo
+                    if (
+                        window.google.maps
+                            .Geocoder &&
+                        window.google.maps
+                            .DirectionsService
+                    ) {
+                        initMap();
+                    } else {
+                        console.error(
+                            'Google Maps API not fully loaded.'
+                        );
+                    }
+                } else {
+                    console.error(
+                        'Google Maps API not loaded properly.'
+                    );
+                }
+            };
+            script.onerror = () => {
+                console.error(
+                    'Failed to load Google Maps API.'
+                );
             };
             document.body.appendChild(script);
-        } else if (!mapInitialized) {
-            initMap();
+        } else if (
+            !mapInitialized &&
+            window.google &&
+            window.google.maps
+        ) {
+            if (
+                window.google.maps.Geocoder &&
+                window.google.maps
+                    .DirectionsService
+            ) {
+                initMap();
+            } else {
+                console.error(
+                    'Google Maps API not fully loaded.'
+                );
+            }
         }
 
         return () => {
@@ -353,11 +393,11 @@ const GoogleTravel = () => {
                     }
                 />
 
-                <InputGroup class="input-group mb-3">
-                    <div class="input-group-prepend">
+                <InputGroup className="input-group mb-3">
+                    <div className="input-group-prepend">
                         <label
-                            class="input-group-text bg-secondary text-light rounded-end-0 border border-secondary"
-                            for="inputGroupSelect01"
+                            className="input-group-text bg-secondary text-light rounded-end-0 border border-secondary"
+                            htmlFor="inputGroupSelect01"
                         >
                             Viagem
                         </label>
@@ -374,7 +414,7 @@ const GoogleTravel = () => {
                     >
                         <option
                             value="DRIVING"
-                            selected
+                            defaultValue={true}
                         >
                             Carro
                         </option>
@@ -403,7 +443,10 @@ const GoogleTravel = () => {
                     >
                         Ler Instruções
                     </button>
-                    <button onClick={refreshPage} className='btn btn-danger d-grid gap-2 d-md-block'>
+                    <button
+                        onClick={refreshPage}
+                        className="btn btn-danger d-grid gap-2 d-md-block"
+                    >
                         Atualizar Página
                     </button>
                 </ContainerBtns>
