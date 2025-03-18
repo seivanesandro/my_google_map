@@ -181,9 +181,9 @@ const ContainerBtns = styled.div`
         gap: 1.5rem !important;
         flex-direction: column !important;
     }
-
-    @media only screen and (${devices.mobileP}) {
-        gap: 1rem !important;
+    @media only screen and (${devices.mobileG}) {
+        gap: 1.5rem !important;
+        flex-direction: column !important;
     }
 `;
 
