@@ -9,6 +9,9 @@ const GoogleMapsComponent = () => {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const userMarkerRef = useRef(null);
+    const trafficLayerRef = useRef(null);
+    const directionsServiceRef = useRef(null);
+    const directionsRendererRef = useRef(null);
     const [userPosition, setUserPosition] =
         useState(null);
     const [destination, setDestination] =
@@ -61,6 +64,22 @@ const GoogleMapsComponent = () => {
                 );
 
             mapInstanceRef.current = map;
+
+            // Add traffic layer
+            trafficLayerRef.current =
+                new window.google.maps.TrafficLayer();
+            trafficLayerRef.current.setMap(map);
+
+            // Initialize directions services
+            directionsServiceRef.current =
+                new window.google.maps.DirectionsService();
+            directionsRendererRef.current =
+                new window.google.maps.DirectionsRenderer(
+                    {
+                        map: map,
+                        suppressMarkers: false
+                    }
+                );
 
             // Add a marker for the user's location
             userMarkerRef.current =
@@ -136,6 +155,41 @@ const GoogleMapsComponent = () => {
         }
     }, [updateUserPosition]);
 
+    // Calculate route
+    const calculateRoute = useCallback(() => {
+        if (!destination || !userPosition) {
+            alert(
+                'Please enter a destination and allow location access.'
+            );
+            return;
+        }
+
+        directionsServiceRef.current.route(
+            {
+                origin: userPosition,
+                destination: destination,
+                travelMode:
+                    window.google.maps.TravelMode
+                        .DRIVING
+            },
+            (result, status) => {
+                if (status === 'OK' && result) {
+                    directionsRendererRef.current.setDirections(
+                        result
+                    );
+                } else {
+                    console.error(
+                        'Error calculating route:',
+                        status
+                    );
+                    alert(
+                        'Unable to calculate route. Please check the destination.'
+                    );
+                }
+            }
+        );
+    }, [destination, userPosition]);
+
     useEffect(() => {
         const loadMap = async () => {
             try {
@@ -181,6 +235,19 @@ const GoogleMapsComponent = () => {
         };
 
         loadMap();
+
+        return () => {
+            if (trafficLayerRef.current) {
+                trafficLayerRef.current.setMap(
+                    null
+                );
+            }
+            if (directionsRendererRef.current) {
+                directionsRendererRef.current.setMap(
+                    null
+                );
+            }
+        };
     }, [
         loadGoogleMapsScript,
         initMap,
@@ -209,6 +276,7 @@ const GoogleMapsComponent = () => {
                     }}
                 />
                 <button
+                    onClick={calculateRoute}
                     style={{
                         padding: '10px 20px',
                         backgroundColor:
