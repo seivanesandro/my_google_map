@@ -187,7 +187,7 @@ const ContainerBtns = styled.div`
     }
 `;
 
-let googleMapsScriptLoaded = false;
+//let googleMapsScriptLoaded = false;
 
 const GoogleTravel = () => {
     // Referências para elementos do mapa e serviços
@@ -201,6 +201,7 @@ const GoogleTravel = () => {
     const watchIdRef = useRef(null);
     const lastSpokenInstructionIndexRef = useRef(-1);
 
+
    // Chaves da API do Google Maps carregadas das variáveis de ambiente
     const apiGoogleMapKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
     const apiGoogleMapURL = process.env.REACT_APP_GOOGLE_MAPS_API_URL;
@@ -211,6 +212,7 @@ const GoogleTravel = () => {
     const [travelMode, setTravelMode] = useState('DRIVING');
     const [mapInitialized, setMapInitialized] = useState(false);
     const [directionsResult, setDirectionsResult] = useState(null);
+
 
     // Atualiza a posição do marcador do utilizador no mapa
     const updateUserMarker = useCallback(pos => {
@@ -229,34 +231,30 @@ const GoogleTravel = () => {
     }, []);
 
     // Calcula a rota entre a posição do utilizador e o destino
-    const calculateRoute = useCallback(() => {
+     const calculateRoute = useCallback(() => {
         if (
             !destination ||
             !userPosition ||
-            !directionsServiceRef.current
-        )
+            !directionsServiceRef.current ||
+            !window.google ||
+            !window.google.maps
+        ) {
+            console.warn('Serviços de mapa não inicializados.');
             return;
+        }
 
         directionsServiceRef.current.route(
             {
                 origin: userPosition,
                 destination: destination,
-                travelMode:
-                    window.google.maps.TravelMode[
-                        travelMode
-                    ]
+                travelMode: window.google.maps.TravelMode[travelMode],
             },
             (result, status) => {
                 if (status === 'OK' && result) {
-                    directionsRendererRef.current.setDirections(
-                        result
-                    );
+                    directionsRendererRef.current.setDirections(result);
                     setDirectionsResult(result);
                 } else {
-                    console.error(
-                        'Erro ao calcular rota:',
-                        status
-                    );
+                    console.error('Erro ao calcular rota:', status);
                 }
             }
         );
@@ -264,9 +262,17 @@ const GoogleTravel = () => {
 
     // Inicializa o mapa e os serviços do Google Maps
     const initMap = useCallback(() => {
-        if (!mapRef.current) return;
+        if (
+            !mapRef.current ||
+            !window.google ||
+            !window.google.maps
+        ) {
+            console.warn(
+                'API Google Maps não carregada.'
+            );
+            return;
+        }
 
-        // Cria a instância do mapa
         mapInstanceRef.current =
             new window.google.maps.Map(
                 mapRef.current,
@@ -276,7 +282,6 @@ const GoogleTravel = () => {
                 }
             );
 
-        // Inicializa os serviços de direções e renderização
         directionsServiceRef.current =
             new window.google.maps.DirectionsService();
         directionsRendererRef.current =
@@ -287,16 +292,14 @@ const GoogleTravel = () => {
                 }
             );
 
-        // Adiciona a camada de tráfego ao mapa
         trafficLayerRef.current =
             new window.google.maps.TrafficLayer();
         trafficLayerRef.current.setMap(
             mapInstanceRef.current
         );
 
-        // Inicia o rastreamento da posição do utilizador
-        watchIdRef.current =
-            navigator.geolocation.watchPosition(
+        if (navigator.geolocation) {
+            const watchPositionCallback =
                 position => {
                     const pos = {
                         lat: position.coords
@@ -304,9 +307,25 @@ const GoogleTravel = () => {
                         lng: position.coords
                             .longitude
                     };
-                    setUserPosition(pos);
-                    updateUserMarker(pos);
-                    calculateRoute(); // Recalcula a rota a cada atualização de posição
+                    const newPosition =
+                        JSON.stringify(pos);
+                    const oldPosition =
+                        JSON.stringify(
+                            userPosition
+                        );
+
+                    if (
+                        newPosition !==
+                        oldPosition
+                    ) {
+                        setUserPosition(pos);
+                        updateUserMarker(pos);
+                        calculateRoute();
+                        console.log(
+                            'Posição atualizada:',
+                            pos
+                        );
+                    }
 
                     if (!mapInitialized) {
                         mapInstanceRef.current.setCenter(
@@ -314,55 +333,52 @@ const GoogleTravel = () => {
                         );
                         setMapInitialized(true);
                     }
-                },
-                error => {
-                    console.error(
-                        'Erro de geolocalização:',
-                        error
-                    );
-                    handleLocationError(
-                        true,
-                        mapInstanceRef.current.getCenter()
-                    );
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 2000,
-                    maximumAge: 0
-                }
+                };
+
+            watchIdRef.current =
+                navigator.geolocation.watchPosition(
+                    watchPositionCallback,
+                    error => {
+                        console.error(
+                            'Erro de geolocalização:',
+                            error
+                        );
+                        handleLocationError(
+                            true,
+                            mapInstanceRef.current?.getCenter()
+                        );
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000
+                    }
+                );
+        } else {
+            handleLocationError(
+                false,
+                mapInstanceRef.current?.getCenter()
             );
+        }
     }, [
         mapInitialized,
         updateUserMarker,
-        calculateRoute
+        calculateRoute,
+        userPosition
     ]);
 
     // Lê as instruções do trajeto em voz alta
     const speakDirections = useCallback(() => {
-        if (
-            directionsResult &&
-            window.speechSynthesis
-        ) {
-            const directions =
-                directionsResult.routes[0].legs[0]
-                    .steps;
-            const startIndex =
-                lastSpokenInstructionIndexRef.current +
-                1;
+        if (directionsResult && window.speechSynthesis) {
+            const directions = directionsResult.routes[0].legs[0].steps;
+            const startIndex = lastSpokenInstructionIndexRef.current + 1;
             const instructions = directions
                 .slice(startIndex)
                 .map(step => step.instructions)
                 .join('. ');
             if (instructions) {
-                const utterance =
-                    new SpeechSynthesisUtterance(
-                        instructions
-                    );
-                window.speechSynthesis.speak(
-                    utterance
-                );
-                lastSpokenInstructionIndexRef.current =
-                    directions.length - 1;
+                const utterance = new SpeechSynthesisUtterance(instructions);
+                window.speechSynthesis.speak(utterance);
+                lastSpokenInstructionIndexRef.current = directions.length - 1;
             }
         }
     }, [directionsResult]);
@@ -385,33 +401,17 @@ const GoogleTravel = () => {
 
     // Efeito para carregar o script da API do Google Maps e inicializar o mapa
     useEffect(() => {
-        if (!googleMapsScriptLoaded) {
+        if (window.google && window.google.maps) {
+            initMap();
+        } else {
             const script =
                 document.createElement('script');
             script.src = `${apiGoogleMapURL}?key=${apiGoogleMapKey}&libraries=places`;
             script.onload = () => {
-                googleMapsScriptLoaded = true;
-                if (
-                    window.google &&
-                    window.google.maps
-                ) {
-                    if (
-                        window.google.maps
-                            .Geocoder &&
-                        window.google.maps
-                            .DirectionsService
-                    ) {
-                        initMap();
-                    } else {
-                        console.error(
-                            'Google Maps API not fully loaded.'
-                        );
-                    }
-                } else {
-                    console.error(
-                        'Google Maps API not loaded properly.'
-                    );
-                }
+                console.log(
+                    'Google Maps API loaded.'
+                );
+                initMap();
             };
             script.onerror = () => {
                 console.error(
@@ -419,22 +419,6 @@ const GoogleTravel = () => {
                 );
             };
             document.body.appendChild(script);
-        } else if (
-            !mapInitialized &&
-            window.google &&
-            window.google.maps
-        ) {
-            if (
-                window.google.maps.Geocoder &&
-                window.google.maps
-                    .DirectionsService
-            ) {
-                initMap();
-            } else {
-                console.error(
-                    'Google Maps API not fully loaded.'
-                );
-            }
         }
 
         return () => {
@@ -445,92 +429,101 @@ const GoogleTravel = () => {
             }
         };
     }, [
-        apiGoogleMapKey,
-        apiGoogleMapURL,
         initMap,
-        mapInitialized
+        apiGoogleMapKey,
+        apiGoogleMapURL
     ]);
 
     return (
-        <ContainerGoogleMaps className="container container-google-map">
-            <ContainerFormStyle className="container-form">
-                <InputWidth
-                    type="text"
-                    id="destination"
-                    className="form-control w-100 border border-secondary outline-transparent shadow-0"
-                    style={{ boxShadow: 'none' }}
-                    placeholder="Destino"
-                    value={destination}
-                    onChange={e =>
-                        setDestination(
-                            e.target.value
-                        )
-                    }
-                />
-
-                <InputGroup className="input-group mb-3">
-                    <div className="input-group-prepend">
-                        <label
-                            className="input-group-text bg-secondary text-light rounded-end-0 border border-secondary"
-                            htmlFor="inputGroupSelect01"
-                        >
-                            Viagem
-                        </label>
-                    </div>
-                    <select
-                        className="custom-select rounded-end-1"
-                        id="travelMode"
-                        value={travelMode}
+        <>
+            <ContainerGoogleMaps className="container container-google-map">
+                <ContainerFormStyle className="container-form">
+                    <InputWidth
+                        type="text"
+                        id="destination"
+                        className="form-control w-100 border border-secondary outline-transparent shadow-0"
+                        style={{
+                            boxShadow: 'none'
+                        }}
+                        placeholder="Destino"
+                        value={destination}
                         onChange={e =>
-                            setTravelMode(
+                            setDestination(
                                 e.target.value
                             )
                         }
-                    >
-                        <option
-                            value="DRIVING"
-                            defaultValue={true}
-                        >
-                            Carro
-                        </option>
-                        <option value="WALKING">
-                            A pé
-                        </option>
-                        <option value="TRANSIT">
-                            Transporte público
-                        </option>
-                        <option value="BICYCLING">
-                            Bicicleta
-                        </option>
-                    </select>
-                </InputGroup>
+                    />
 
-                <ContainerBtns className="container-btns">
-                    <button
-                        className="btn btn-success d-grid gap-2 d-md-block"
-                        onClick={calculateRoute}
-                    >
-                        Calcular Rota
-                    </button>
-                    <button
-                        className="btn btn-info d-grid gap-2 d-md-block"
-                        onClick={speakDirections}
-                    >
-                        Ler Instruções
-                    </button>
-                </ContainerBtns>
-            </ContainerFormStyle>
-            <MapStyle
-                id="map"
-                ref={mapRef}
-                className="map-style"
-            ></MapStyle>
-            <DirectionsPanelStyle
-                id="directionsPanel"
-                ref={directionsPanelRef}
-                className="direction-panel"
-            ></DirectionsPanelStyle>
-        </ContainerGoogleMaps>
+                    <InputGroup className="input-group mb-3">
+                        <div className="input-group-prepend">
+                            <label
+                                className="input-group-text bg-secondary text-light rounded-end-0 border border-secondary"
+                                htmlFor="inputGroupSelect01"
+                            >
+                                Viagem
+                            </label>
+                        </div>
+                        <select
+                            className="custom-select rounded-end-1"
+                            id="travelMode"
+                            value={travelMode}
+                            onChange={e =>
+                                setTravelMode(
+                                    e.target.value
+                                )
+                            }
+                        >
+                            <option
+                                value="DRIVING"
+                                defaultValue={
+                                    true
+                                }
+                            >
+                                Carro
+                            </option>
+                            <option value="WALKING">
+                                A pé
+                            </option>
+                            <option value="TRANSIT">
+                                Transporte público
+                            </option>
+                            <option value="BICYCLING">
+                                Bicicleta
+                            </option>
+                        </select>
+                    </InputGroup>
+
+                    <ContainerBtns className="container-btns">
+                        <button
+                            className="btn btn-success d-grid gap-2 d-md-block"
+                            onClick={
+                                calculateRoute
+                            }
+                        >
+                            Calcular Rota
+                        </button>
+                        <button
+                            className="btn btn-info d-grid gap-2 d-md-block"
+                            onClick={
+                                speakDirections
+                            }
+                        >
+                            Ler Instruções
+                        </button>
+                    </ContainerBtns>
+                </ContainerFormStyle>
+                <MapStyle
+                    id="map"
+                    ref={mapRef}
+                    className="map-style"
+                ></MapStyle>
+                <DirectionsPanelStyle
+                    id="directionsPanel"
+                    ref={directionsPanelRef}
+                    className="direction-panel"
+                ></DirectionsPanelStyle>
+            </ContainerGoogleMaps>
+        </>
     );
 };
 
