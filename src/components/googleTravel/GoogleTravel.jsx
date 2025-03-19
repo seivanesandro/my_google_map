@@ -190,6 +190,7 @@ const ContainerBtns = styled.div`
 let googleMapsScriptLoaded = false;
 
 const GoogleTravel = () => {
+    // Referências para elementos do mapa e serviços
     const mapRef = useRef(null);
     const directionsPanelRef = useRef(null);
     const mapInstanceRef = useRef(null);
@@ -198,26 +199,20 @@ const GoogleTravel = () => {
     const trafficLayerRef = useRef(null);
     const userMarkerRef = useRef(null);
     const watchIdRef = useRef(null);
+    const lastSpokenInstructionIndexRef = useRef(-1);
 
-    const apiGoogleMapKey =
-        process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
-    const apiGoogleMapURL =
-        process.env.REACT_APP_GOOGLE_MAPS_API_URL;
+   // Chaves da API do Google Maps carregadas das variáveis de ambiente
+    const apiGoogleMapKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+    const apiGoogleMapURL = process.env.REACT_APP_GOOGLE_MAPS_API_URL;
 
-    const [userPosition, setUserPosition] =
-        useState(null);
-    const [destination, setDestination] =
-        useState('');
-    const [travelMode, setTravelMode] =
-        useState('DRIVING');
-    const [mapInitialized, setMapInitialized] =
-        useState(false);
-    const [
-        directionsResult,
-        setDirectionsResult
-    ] = useState(null);
+    // Estados para gerir a posição do utilizador, destino, modo de viagem, etc.
+    const [userPosition, setUserPosition] = useState(null);
+    const [destination, setDestination] = useState('');
+    const [travelMode, setTravelMode] = useState('DRIVING');
+    const [mapInitialized, setMapInitialized] = useState(false);
+    const [directionsResult, setDirectionsResult] = useState(null);
 
-    // Atualiza a posição do marcador do utilizador
+    // Atualiza a posição do marcador do utilizador no mapa
     const updateUserMarker = useCallback(pos => {
         if (userMarkerRef.current) {
             userMarkerRef.current.setPosition(
@@ -233,18 +228,55 @@ const GoogleTravel = () => {
         mapInstanceRef.current.setCenter(pos);
     }, []);
 
+    // Calcula a rota entre a posição do utilizador e o destino
+    const calculateRoute = useCallback(() => {
+        if (
+            !destination ||
+            !userPosition ||
+            !directionsServiceRef.current
+        )
+            return;
+
+        directionsServiceRef.current.route(
+            {
+                origin: userPosition,
+                destination: destination,
+                travelMode:
+                    window.google.maps.TravelMode[
+                        travelMode
+                    ]
+            },
+            (result, status) => {
+                if (status === 'OK' && result) {
+                    directionsRendererRef.current.setDirections(
+                        result
+                    );
+                    setDirectionsResult(result);
+                } else {
+                    console.error(
+                        'Erro ao calcular rota:',
+                        status
+                    );
+                }
+            }
+        );
+    }, [destination, travelMode, userPosition]);
+
+    // Inicializa o mapa e os serviços do Google Maps
     const initMap = useCallback(() => {
         if (!mapRef.current) return;
 
+        // Cria a instância do mapa
         mapInstanceRef.current =
             new window.google.maps.Map(
                 mapRef.current,
                 {
                     center: { lat: 0, lng: 0 },
-                    zoom: 15
+                    zoom: 18
                 }
             );
 
+        // Inicializa os serviços de direções e renderização
         directionsServiceRef.current =
             new window.google.maps.DirectionsService();
         directionsRendererRef.current =
@@ -255,12 +287,14 @@ const GoogleTravel = () => {
                 }
             );
 
+        // Adiciona a camada de tráfego ao mapa
         trafficLayerRef.current =
             new window.google.maps.TrafficLayer();
         trafficLayerRef.current.setMap(
             mapInstanceRef.current
         );
 
+        // Inicia o rastreamento da posição do utilizador
         watchIdRef.current =
             navigator.geolocation.watchPosition(
                 position => {
@@ -272,6 +306,8 @@ const GoogleTravel = () => {
                     };
                     setUserPosition(pos);
                     updateUserMarker(pos);
+                    calculateRoute(); // Recalcula a rota a cada atualização de posição
+
                     if (!mapInitialized) {
                         mapInstanceRef.current.setCenter(
                             pos
@@ -291,80 +327,14 @@ const GoogleTravel = () => {
                 },
                 {
                     enableHighAccuracy: true,
-                    timeout: 5000,
+                    timeout: 2000,
                     maximumAge: 0
                 }
             );
-    }, [mapInitialized, updateUserMarker]);
-
-    // Atualiza o trajeto no mapa, se já tiver sido calculado
-    const updateRoute = useCallback(() => {
-        if (
-            directionsResult &&
-            directionsRendererRef.current
-        ) {
-            directionsRendererRef.current.setDirections(
-                directionsResult
-            );
-        }
-    }, [directionsResult]);
-
-    // Calcula a rota entre a posição do utilizador e o destino
-    const calculateRoute = useCallback(() => {
-        if (!destination) {
-            alert(
-                'Por favor, insira um destino.'
-            );
-            return;
-        }
-
-        if (
-            userPosition &&
-            directionsServiceRef.current &&
-            directionsRendererRef.current
-        ) {
-            directionsServiceRef.current.route(
-                {
-                    origin: userPosition,
-                    destination: destination,
-                    travelMode:
-                        window.google.maps
-                            .TravelMode[
-                            travelMode
-                        ]
-                },
-                (result, status) => {
-                    if (
-                        status === 'OK' &&
-                        result
-                    ) {
-                        directionsRendererRef.current.setDirections(
-                            result
-                        );
-                        setDirectionsResult(
-                            result
-                        );
-                    } else {
-                        console.error(
-                            'Erro ao calcular rota:',
-                            status
-                        );
-                    }
-                }
-            );
-        }
-    }, [destination, travelMode, userPosition]);
-
-    // Atualiza a localização do utilizador e o trajeto no mapa
-    const refreshLocation = useCallback(() => {
-        if (userPosition) {
-            updateUserMarker(userPosition);
-            updateRoute();
-        }
     }, [
-        userPosition,
-        updateRoute,
-        updateUserMarker
+        mapInitialized,
+        updateUserMarker,
+        calculateRoute
     ]);
 
     // Lê as instruções do trajeto em voz alta
@@ -376,16 +346,24 @@ const GoogleTravel = () => {
             const directions =
                 directionsResult.routes[0].legs[0]
                     .steps;
+            const startIndex =
+                lastSpokenInstructionIndexRef.current +
+                1;
             const instructions = directions
+                .slice(startIndex)
                 .map(step => step.instructions)
                 .join('. ');
-            const utterance =
-                new SpeechSynthesisUtterance(
-                    instructions
+            if (instructions) {
+                const utterance =
+                    new SpeechSynthesisUtterance(
+                        instructions
+                    );
+                window.speechSynthesis.speak(
+                    utterance
                 );
-            window.speechSynthesis.speak(
-                utterance
-            );
+                lastSpokenInstructionIndexRef.current =
+                    directions.length - 1;
+            }
         }
     }, [directionsResult]);
 
@@ -539,12 +517,6 @@ const GoogleTravel = () => {
                         onClick={speakDirections}
                     >
                         Ler Instruções
-                    </button>
-                    <button
-                        onClick={refreshLocation}
-                        className="btn btn-danger d-grid gap-2 d-md-block"
-                    >
-                        Atualizar Página
                     </button>
                 </ContainerBtns>
             </ContainerFormStyle>
