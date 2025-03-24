@@ -6,11 +6,14 @@ import React, {
 } from 'react';
 
 const GoogleMapsComponent = () => {
+    // Referências para o mapa, serviços de direções e marcador do usuário
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const userMarkerRef = useRef(null);
     const directionsServiceRef = useRef(null);
     const directionsRendererRef = useRef(null);
+
+    // Estados para armazenar a posição do usuário, destino, direções e tempo estimado
     const [userPosition, setUserPosition] =
         useState(null);
     const [destination, setDestination] =
@@ -24,11 +27,15 @@ const GoogleMapsComponent = () => {
         isNavigationActive,
         setIsNavigationActive
     ] = useState(false);
+    const [
+        currentStepIndex,
+        setCurrentStepIndex
+    ] = useState(0);
 
     const apiGoogleMapKey =
         process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
-    // Load Google Maps script
+    // Função para carregar o script do Google Maps
     const loadGoogleMapsScript =
         useCallback(() => {
             if (
@@ -70,7 +77,7 @@ const GoogleMapsComponent = () => {
             );
         }, [apiGoogleMapKey]);
 
-    // Initialize the map
+    // Função para inicializar o mapa com a posição do usuário
     const initMap = useCallback(userLatLng => {
         if (
             window.google &&
@@ -88,12 +95,12 @@ const GoogleMapsComponent = () => {
 
             mapInstanceRef.current = map;
 
-            // Add traffic layer
+            // Adiciona a camada de tráfego ao mapa
             const trafficLayer =
                 new window.google.maps.TrafficLayer();
             trafficLayer.setMap(map);
 
-            // Initialize directions services
+            // Inicializa os serviços de direções
             directionsServiceRef.current =
                 new window.google.maps.DirectionsService();
             directionsRendererRef.current =
@@ -104,7 +111,7 @@ const GoogleMapsComponent = () => {
                     }
                 );
 
-            // Add a marker for the user's location
+            // Adiciona um marcador para a posição do usuário
             userMarkerRef.current =
                 new window.google.maps.Marker({
                     position: userLatLng,
@@ -114,7 +121,7 @@ const GoogleMapsComponent = () => {
         }
     }, []);
 
-    // Update user's position on the map
+    // Função para atualizar a posição do usuário no mapa
     const updateUserPosition = useCallback(
         userLatLng => {
             if (userMarkerRef.current) {
@@ -141,7 +148,7 @@ const GoogleMapsComponent = () => {
         []
     );
 
-    // Calculate route
+    // Função para calcular a rota entre a posição do usuário e o destino
     const calculateRoute = useCallback(() => {
         if (!destination || !userPosition) {
             alert(
@@ -164,7 +171,7 @@ const GoogleMapsComponent = () => {
                         result
                     );
 
-                    // Extract directions and travel time
+                    // Extrai as direções e o tempo estimado
                     const steps =
                         result.routes[0].legs[0]
                             .steps;
@@ -187,7 +194,7 @@ const GoogleMapsComponent = () => {
         );
     }, [destination, userPosition]);
 
-    // Start navigation
+    // Função para iniciar a navegação
     const startNavigation = () => {
         if (directions.length === 0) {
             alert(
@@ -197,9 +204,8 @@ const GoogleMapsComponent = () => {
         }
 
         setIsNavigationActive(true);
-        let currentStepIndex = 0;
 
-        // Monitor user's position and narrate directions
+        // Monitora a posição do usuário e atualiza a rota dinamicamente
         const watchId =
             navigator.geolocation.watchPosition(
                 position => {
@@ -214,7 +220,7 @@ const GoogleMapsComponent = () => {
                         userLatLng
                     );
 
-                    // Check if user has reached the next step
+                    // Verifica se o usuário atingiu o próximo ponto da rota
                     if (
                         currentStepIndex <
                         directions.length
@@ -239,7 +245,7 @@ const GoogleMapsComponent = () => {
                             );
 
                         if (distance < 50) {
-                            // Narrate the next step
+                            // Narra a próxima instrução
                             const synth =
                                 window.speechSynthesis;
                             const utterance =
@@ -253,8 +259,11 @@ const GoogleMapsComponent = () => {
                                 utterance
                             );
 
-                            // Move to the next step
-                            currentStepIndex++;
+                            // Avança para a próxima etapa
+                            setCurrentStepIndex(
+                                prevIndex =>
+                                    prevIndex + 1
+                            );
                         }
                     }
                 },
@@ -270,7 +279,7 @@ const GoogleMapsComponent = () => {
                 }
             );
 
-        // Stop navigation when canceled
+        // Para a navegação quando cancelada
         return () => {
             navigator.geolocation.clearWatch(
                 watchId
@@ -279,20 +288,20 @@ const GoogleMapsComponent = () => {
         };
     };
 
-    // Cancel navigation
+    // Função para cancelar a navegação
     const cancelNavigation = () => {
         setIsNavigationActive(false);
         if (window.speechSynthesis) {
-            window.speechSynthesis.cancel(); // Stop any ongoing narration
+            window.speechSynthesis.cancel(); // Interrompe qualquer narração em andamento
         }
     };
 
+    // Carrega o mapa e obtém a posição inicial do usuário
     useEffect(() => {
         const loadMap = async () => {
             try {
                 await loadGoogleMapsScript();
 
-                // Get user's initial position
                 navigator.geolocation.getCurrentPosition(
                     position => {
                         const userLatLng = {
