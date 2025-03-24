@@ -36,14 +36,16 @@ function App() {
 
         return () => observer.disconnect();
     }, []);
-  return (
-      <div className="App">
-          <h1 className='text-center text-light my-5'>My travel Maps</h1>
-          {/* <GoogleTravel /> */}
-          <GoogleMapsComponent />
-          <Footer />
-      </div>
-  );
+    return (
+        <div className="App">
+            <h1 className="text-center text-light my-5">
+                My travel Maps
+            </h1>
+            {/* <GoogleTravel /> */}
+            <GoogleMapsComponent />
+            <Footer />
+        </div>
+    );
 }
 
 export default App;

@@ -9,13 +9,21 @@ const GoogleMapsComponent = () => {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const userMarkerRef = useRef(null);
-    const trafficLayerRef = useRef(null);
     const directionsServiceRef = useRef(null);
     const directionsRendererRef = useRef(null);
     const [userPosition, setUserPosition] =
         useState(null);
     const [destination, setDestination] =
         useState('');
+    const [directions, setDirections] = useState(
+        []
+    );
+    const [travelTime, setTravelTime] =
+        useState('');
+    const [
+        isNavigationActive,
+        setIsNavigationActive
+    ] = useState(false);
 
     const apiGoogleMapKey =
         process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
@@ -23,26 +31,41 @@ const GoogleMapsComponent = () => {
     // Load Google Maps script
     const loadGoogleMapsScript =
         useCallback(() => {
+            if (
+                window.google &&
+                window.google.maps
+            ) {
+                console.log(
+                    'Google Maps script already loaded.'
+                );
+                return Promise.resolve();
+            }
+
             return new Promise(
                 (resolve, reject) => {
-                    if (
-                        window.google &&
-                        window.google.maps
-                    ) {
-                        resolve();
-                    } else {
-                        const script =
-                            document.createElement(
-                                'script'
-                            );
-                        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiGoogleMapKey}&libraries=places`;
-                        script.defer = true;
-                        script.onload = resolve;
-                        script.onerror = reject;
-                        document.head.appendChild(
-                            script
+                    const existingScript =
+                        document.querySelector(
+                            `script[src*="maps.googleapis.com"]`
                         );
+                    if (existingScript) {
+                        console.log(
+                            'Google Maps script already exists.'
+                        );
+                        resolve();
+                        return;
                     }
+
+                    const script =
+                        document.createElement(
+                            'script'
+                        );
+                    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiGoogleMapKey}&libraries=places`;
+                    script.defer = true;
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(
+                        script
+                    );
                 }
             );
         }, [apiGoogleMapKey]);
@@ -66,9 +89,9 @@ const GoogleMapsComponent = () => {
             mapInstanceRef.current = map;
 
             // Add traffic layer
-            trafficLayerRef.current =
+            const trafficLayer =
                 new window.google.maps.TrafficLayer();
-            trafficLayerRef.current.setMap(map);
+            trafficLayer.setMap(map);
 
             // Initialize directions services
             directionsServiceRef.current =
@@ -118,43 +141,6 @@ const GoogleMapsComponent = () => {
         []
     );
 
-    // Watch user's position in real-time
-    const watchUserPosition = useCallback(() => {
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(
-                position => {
-                    const userLatLng = {
-                        lat: position.coords
-                            .latitude,
-                        lng: position.coords
-                            .longitude
-                    };
-                    setUserPosition(userLatLng);
-                    updateUserPosition(
-                        userLatLng
-                    );
-                },
-                error => {
-                    console.error(
-                        'Error getting user location:',
-                        error
-                    );
-                    alert(
-                        'Unable to retrieve your location. Please enable location services.'
-                    );
-                },
-                {
-                    enableHighAccuracy: true,
-                    maximumAge: 0
-                }
-            );
-        } else {
-            alert(
-                'Geolocation is not supported by your browser.'
-            );
-        }
-    }, [updateUserPosition]);
-
     // Calculate route
     const calculateRoute = useCallback(() => {
         if (!destination || !userPosition) {
@@ -177,6 +163,17 @@ const GoogleMapsComponent = () => {
                     directionsRendererRef.current.setDirections(
                         result
                     );
+
+                    // Extract directions and travel time
+                    const steps =
+                        result.routes[0].legs[0]
+                            .steps;
+                    const duration =
+                        result.routes[0].legs[0]
+                            .duration.text;
+
+                    setDirections(steps);
+                    setTravelTime(duration);
                 } else {
                     console.error(
                         'Error calculating route:',
@@ -189,6 +186,106 @@ const GoogleMapsComponent = () => {
             }
         );
     }, [destination, userPosition]);
+
+    // Start navigation
+    const startNavigation = () => {
+        if (directions.length === 0) {
+            alert(
+                'Please calculate a route first.'
+            );
+            return;
+        }
+
+        setIsNavigationActive(true);
+        let currentStepIndex = 0;
+
+        // Monitor user's position and narrate directions
+        const watchId =
+            navigator.geolocation.watchPosition(
+                position => {
+                    const userLatLng = {
+                        lat: position.coords
+                            .latitude,
+                        lng: position.coords
+                            .longitude
+                    };
+                    setUserPosition(userLatLng);
+                    updateUserPosition(
+                        userLatLng
+                    );
+
+                    // Check if user has reached the next step
+                    if (
+                        currentStepIndex <
+                        directions.length
+                    ) {
+                        const nextStep =
+                            directions[
+                                currentStepIndex
+                            ];
+                        const stepLatLng =
+                            new window.google.maps.LatLng(
+                                nextStep.end_location.lat,
+                                nextStep.end_location.lng
+                            );
+
+                        const distance =
+                            window.google.maps.geometry.spherical.computeDistanceBetween(
+                                new window.google.maps.LatLng(
+                                    userLatLng.lat,
+                                    userLatLng.lng
+                                ),
+                                stepLatLng
+                            );
+
+                        if (distance < 50) {
+                            // Narrate the next step
+                            const synth =
+                                window.speechSynthesis;
+                            const utterance =
+                                new SpeechSynthesisUtterance(
+                                    nextStep.instructions.replace(
+                                        /<[^>]*>/g,
+                                        ''
+                                    )
+                                );
+                            synth.speak(
+                                utterance
+                            );
+
+                            // Move to the next step
+                            currentStepIndex++;
+                        }
+                    }
+                },
+                error => {
+                    console.error(
+                        'Error watching user location:',
+                        error
+                    );
+                },
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 0
+                }
+            );
+
+        // Stop navigation when canceled
+        return () => {
+            navigator.geolocation.clearWatch(
+                watchId
+            );
+            setIsNavigationActive(false);
+        };
+    };
+
+    // Cancel navigation
+    const cancelNavigation = () => {
+        setIsNavigationActive(false);
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel(); // Stop any ongoing narration
+        }
+    };
 
     useEffect(() => {
         const loadMap = async () => {
@@ -223,9 +320,6 @@ const GoogleMapsComponent = () => {
                         maximumAge: 0
                     }
                 );
-
-                // Watch user's position in real-time
-                watchUserPosition();
             } catch (error) {
                 console.error(
                     'Error loading Google Maps script:',
@@ -237,22 +331,13 @@ const GoogleMapsComponent = () => {
         loadMap();
 
         return () => {
-            if (trafficLayerRef.current) {
-                trafficLayerRef.current.setMap(
-                    null
-                );
-            }
             if (directionsRendererRef.current) {
                 directionsRendererRef.current.setMap(
                     null
                 );
             }
         };
-    }, [
-        loadGoogleMapsScript,
-        initMap,
-        watchUserPosition
-    ]);
+    }, [loadGoogleMapsScript, initMap]);
 
     return (
         <div style={{ padding: '20px' }}>
@@ -289,6 +374,45 @@ const GoogleMapsComponent = () => {
                 >
                     Calculate Route
                 </button>
+                {directions.length > 0 &&
+                    !isNavigationActive && (
+                        <button
+                            onClick={
+                                startNavigation
+                            }
+                            style={{
+                                padding:
+                                    '10px 20px',
+                                backgroundColor:
+                                    '#28a745',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius:
+                                    '4px',
+                                cursor: 'pointer',
+                                marginLeft: '10px'
+                            }}
+                        >
+                            Start Navigation
+                        </button>
+                    )}
+                {isNavigationActive && (
+                    <button
+                        onClick={cancelNavigation}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor:
+                                '#dc3545',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            marginLeft: '10px'
+                        }}
+                    >
+                        Cancel Navigation
+                    </button>
+                )}
             </div>
             <div
                 ref={mapRef}
@@ -299,21 +423,14 @@ const GoogleMapsComponent = () => {
                     borderRadius: '4px'
                 }}
             ></div>
-            {userPosition && (
+            {directions.length > 0 && (
                 <div
                     style={{ marginTop: '20px' }}
                 >
                     <h3>
-                        Your Current Location:
+                        Estimated Travel Time:{' '}
+                        {travelTime}
                     </h3>
-                    <p>
-                        Latitude:{' '}
-                        {userPosition.lat}
-                    </p>
-                    <p>
-                        Longitude:{' '}
-                        {userPosition.lng}
-                    </p>
                 </div>
             )}
         </div>

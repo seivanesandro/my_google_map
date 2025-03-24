@@ -1,7 +1,13 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import styled, { keyframes } from 'styled-components';
+import React, {
+    useCallback,
+    useEffect,
+    useRef,
+    useState
+} from 'react';
+import styled, {
+    keyframes
+} from 'styled-components';
 import { devices } from '../../utils/constantes';
-
 
 const Show = keyframes`
     0%{
@@ -188,7 +194,6 @@ const ContainerBtns = styled.div`
 `;
 
 //let googleMapsScriptLoaded = false;
-
 
 const GoogleTravel = () => {
     const mapRef = useRef(null);
