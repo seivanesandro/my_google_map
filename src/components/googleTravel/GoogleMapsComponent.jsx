@@ -467,7 +467,7 @@ const GoogleMapsComponent = () => {
                         padding: '10px',
                         backgroundColor:
                             '#f8f9fa',
-                        color: '#fff',
+                        color: '#333',
                         border: '1px solid #ccc',
                         borderRadius: '4px'
                     }}
