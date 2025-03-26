@@ -41,8 +41,7 @@ const GoogleMapsComponent = () => {
         process.env.REACT_APP_GOOGLE_MAPS_API_KEY; // Chave da API do Google Maps
 
     // Função para carregar o script do Google Maps
-    const loadGoogleMapsScript =
-        useCallback(() => {
+    const loadGoogleMapsScript = useCallback(() => {
             if (
                 window.google &&
                 window.google.maps
@@ -230,8 +229,7 @@ const GoogleMapsComponent = () => {
             )
         ); // Exibe a primeira instrução
 
-        const watchId =
-            navigator.geolocation.watchPosition(
+        const watchId = navigator.geolocation.watchPosition(
                 position => {
                     const userLatLng = {
                         lat: position.coords
