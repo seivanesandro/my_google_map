@@ -6,14 +6,14 @@ import React, {
 } from 'react';
 
 const GoogleMapsComponent = () => {
-    // Referências para o mapa, serviços de direções e marcador do usuário
+    // Referências para o mapa e serviços do Google Maps
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const userMarkerRef = useRef(null);
     const directionsServiceRef = useRef(null);
     const directionsRendererRef = useRef(null);
 
-    // Estados para armazenar a posição do usuário, destino, direções e tempo estimado
+    // Estados para armazenar informações do usuário e da navegação
     const [userPosition, setUserPosition] =
         useState(null);
     const [destination, setDestination] =
@@ -31,6 +31,10 @@ const GoogleMapsComponent = () => {
         currentStepIndex,
         setCurrentStepIndex
     ] = useState(0);
+    const [
+        currentInstruction,
+        setCurrentInstruction
+    ] = useState('');
 
     const apiGoogleMapKey =
         process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
@@ -42,9 +46,6 @@ const GoogleMapsComponent = () => {
                 window.google &&
                 window.google.maps
             ) {
-                console.log(
-                    'Google Maps script already loaded.'
-                );
                 return Promise.resolve();
             }
 
@@ -55,9 +56,6 @@ const GoogleMapsComponent = () => {
                             `script[src*="maps.googleapis.com"]`
                         );
                     if (existingScript) {
-                        console.log(
-                            'Google Maps script already exists.'
-                        );
                         resolve();
                         return;
                     }
@@ -77,7 +75,7 @@ const GoogleMapsComponent = () => {
             );
         }, [apiGoogleMapKey]);
 
-    // Função para inicializar o mapa com a posição do usuário
+    // Função para inicializar o mapa
     const initMap = useCallback(userLatLng => {
         if (
             window.google &&
@@ -95,12 +93,10 @@ const GoogleMapsComponent = () => {
 
             mapInstanceRef.current = map;
 
-            // Adiciona a camada de tráfego ao mapa
             const trafficLayer =
                 new window.google.maps.TrafficLayer();
             trafficLayer.setMap(map);
 
-            // Inicializa os serviços de direções
             directionsServiceRef.current =
                 new window.google.maps.DirectionsService();
             directionsRendererRef.current =
@@ -111,7 +107,6 @@ const GoogleMapsComponent = () => {
                     }
                 );
 
-            // Adiciona um marcador para a posição do usuário
             userMarkerRef.current =
                 new window.google.maps.Marker({
                     position: userLatLng,
@@ -148,7 +143,7 @@ const GoogleMapsComponent = () => {
         []
     );
 
-    // Função para calcular a rota entre a posição do usuário e o destino
+    // Função para calcular a rota
     const calculateRoute = useCallback(() => {
         if (!destination || !userPosition) {
             alert(
@@ -171,7 +166,17 @@ const GoogleMapsComponent = () => {
                         result
                     );
 
-                    // Extrai as direções e o tempo estimado
+                    const bounds =
+                        new window.google.maps.LatLngBounds();
+                    result.routes[0].overview_path.forEach(
+                        point => {
+                            bounds.extend(point);
+                        }
+                    );
+                    mapInstanceRef.current.fitBounds(
+                        bounds
+                    );
+
                     const steps =
                         result.routes[0].legs[0]
                             .steps;
@@ -204,8 +209,13 @@ const GoogleMapsComponent = () => {
         }
 
         setIsNavigationActive(true);
+        setCurrentInstruction(
+            directions[0]?.instructions.replace(
+                /<[^>]*>/g,
+                ''
+            )
+        );
 
-        // Monitora a posição do usuário e atualiza a rota dinamicamente
         const watchId =
             navigator.geolocation.watchPosition(
                 position => {
@@ -220,7 +230,6 @@ const GoogleMapsComponent = () => {
                         userLatLng
                     );
 
-                    // Verifica se o usuário atingiu o próximo ponto da rota
                     if (
                         currentStepIndex <
                         directions.length
@@ -245,21 +254,12 @@ const GoogleMapsComponent = () => {
                             );
 
                         if (distance < 50) {
-                            // Narra a próxima instrução
-                            const synth =
-                                window.speechSynthesis;
-                            const utterance =
-                                new SpeechSynthesisUtterance(
-                                    nextStep.instructions.replace(
-                                        /<[^>]*>/g,
-                                        ''
-                                    )
-                                );
-                            synth.speak(
-                                utterance
+                            setCurrentInstruction(
+                                nextStep.instructions.replace(
+                                    /<[^>]*>/g,
+                                    ''
+                                )
                             );
-
-                            // Avança para a próxima etapa
                             setCurrentStepIndex(
                                 prevIndex =>
                                     prevIndex + 1
@@ -279,7 +279,6 @@ const GoogleMapsComponent = () => {
                 }
             );
 
-        // Para a navegação quando cancelada
         return () => {
             navigator.geolocation.clearWatch(
                 watchId
@@ -291,12 +290,32 @@ const GoogleMapsComponent = () => {
     // Função para cancelar a navegação
     const cancelNavigation = () => {
         setIsNavigationActive(false);
+        setCurrentInstruction('');
+        setDirections([]);
+        setDestination('');
+        if (directionsRendererRef.current) {
+            directionsRendererRef.current.setDirections(
+                { routes: [] }
+            );
+        }
         if (window.speechSynthesis) {
-            window.speechSynthesis.cancel(); // Interrompe qualquer narração em andamento
+            window.speechSynthesis.cancel();
         }
     };
 
-    // Carrega o mapa e obtém a posição inicial do usuário
+    // Sincroniza as instruções de voz com os pop-ups
+    useEffect(() => {
+        if (currentInstruction) {
+            const synth = window.speechSynthesis;
+            const utterance =
+                new SpeechSynthesisUtterance(
+                    currentInstruction
+                );
+            synth.speak(utterance);
+        }
+    }, [currentInstruction]); // Executa sempre que `currentInstruction` for atualizado
+
+    // Carrega o mapa ao montar o componente
     useEffect(() => {
         const loadMap = async () => {
             try {
@@ -350,7 +369,6 @@ const GoogleMapsComponent = () => {
 
     return (
         <div style={{ padding: '20px' }}>
-            <h1>Google Maps Application</h1>
             <div style={{ marginBottom: '10px' }}>
                 <input
                     type="text"
@@ -440,6 +458,22 @@ const GoogleMapsComponent = () => {
                         Estimated Travel Time:{' '}
                         {travelTime}
                     </h3>
+                </div>
+            )}
+            {currentInstruction && (
+                <div
+                    style={{
+                        marginTop: '20px',
+                        padding: '10px',
+                        backgroundColor:
+                            '#f8f9fa',
+                        color: '#fff',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px'
+                    }}
+                >
+                    <h4>Current Instruction:</h4>
+                    <p>{currentInstruction}</p>
                 </div>
             )}
         </div>
