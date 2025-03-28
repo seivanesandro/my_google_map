@@ -6,39 +6,40 @@ import React, {
 } from 'react';
 
 const GoogleMapsComponent = () => {
-    const mapRef = useRef(null);
-    const mapInstanceRef = useRef(null);
-    const userMarkerRef = useRef(null);
-    const originMarkerRef = useRef(null);
-    const destinationMarkerRef = useRef(null);
-    const directionsServiceRef = useRef(null);
-    const directionsRendererRef = useRef(null);
+    const mapRef = useRef(null); // Referência para o elemento DOM onde o mapa será renderizado
+    const mapInstanceRef = useRef(null); // Instância do mapa
+    const userMarkerRef = useRef(null); // Marcador da posição do usuário
+    const originMarkerRef = useRef(null); // Marcador para o ponto de origem
+    const destinationMarkerRef = useRef(null); // Marcador para o ponto de destino
+    const directionsServiceRef = useRef(null); // Serviço de rotas do Google Maps
+    const directionsRendererRef = useRef(null); // Renderizador de rotas do Google Maps
 
     const [userPosition, setUserPosition] =
-        useState(null);
+        useState(null); // Posição atual do usuário
     const [destination, setDestination] =
-        useState('');
+        useState(''); // Destino inserido pelo usuário
     const [directions, setDirections] = useState(
         []
-    );
+    ); // Lista de direções (passos da rota)
     const [travelTime, setTravelTime] =
-        useState('');
+        useState(''); // Tempo estimado de viagem
     const [
         currentStepIndex,
         setCurrentStepIndex
-    ] = useState(0);
+    ] = useState(0); // Índice do passo atual da rota
     const [
         currentInstruction,
         setCurrentInstruction
-    ] = useState('');
+    ] = useState(''); // Instrução atual exibida no pop-up
     const [
         isNavigationActive,
         setIsNavigationActive
     ] = useState(false); // Estado para controlar a navegação
 
     const apiGoogleMapKey =
-        process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+        process.env.REACT_APP_GOOGLE_MAPS_API_KEY; // Chave da API do Google Maps
 
+    // Função para carregar o script do Google Maps
     const loadGoogleMapsScript =
         useCallback(() => {
             if (
@@ -74,6 +75,7 @@ const GoogleMapsComponent = () => {
             );
         }, [apiGoogleMapKey]);
 
+    // Função para inicializar o mapa
     const initMap = useCallback(userLatLng => {
         if (
             window.google &&
@@ -116,7 +118,7 @@ const GoogleMapsComponent = () => {
                     map: map,
                     title: 'Your Location',
                     icon: {
-                        url: 'https://img.icons8.com/color/48/000000/car.png',
+                        url: 'https://img.icons8.com/color/48/000000/car.png', // Ícone de carro
                         scaledSize:
                             new window.google.maps.Size(
                                 40,
@@ -127,6 +129,7 @@ const GoogleMapsComponent = () => {
         }
     }, []);
 
+    // Função para atualizar a posição do usuário no mapa
     const updateUserPosition = useCallback(
         userLatLng => {
             if (userMarkerRef.current) {
@@ -141,7 +144,7 @@ const GoogleMapsComponent = () => {
                             map: mapInstanceRef.current,
                             title: 'Your Location',
                             icon: {
-                                url: 'https://img.icons8.com/color/48/000000/car.png',
+                                url: 'https://img.icons8.com/color/48/000000/car.png', // Ícone de carro
                                 scaledSize:
                                     new window.google.maps.Size(
                                         40,
@@ -164,6 +167,7 @@ const GoogleMapsComponent = () => {
         []
     );
 
+    // Função para calcular a rota
     const calculateRoute = useCallback(() => {
         if (!destination || !userPosition) {
             alert(
@@ -196,6 +200,7 @@ const GoogleMapsComponent = () => {
                     setDirections(steps);
                     setTravelTime(duration);
 
+                    // Adiciona o marcador para o ponto de origem
                     if (originMarkerRef.current) {
                         originMarkerRef.current.setMap(
                             null
@@ -212,16 +217,23 @@ const GoogleMapsComponent = () => {
                                 map: mapInstanceRef.current,
                                 title: 'Start Point',
                                 icon: {
-                                    url: 'https://img.icons8.com/fluency/48/000000/marker.png',
-                                    scaledSize:
-                                        new window.google.maps.Size(
-                                            40,
-                                            40
-                                        )
+                                    path: window
+                                        .google
+                                        .maps
+                                        .SymbolPath
+                                        .CIRCLE, // Marcador quadrado pequeno
+                                    fillColor:
+                                        '#007bff',
+                                    fillOpacity: 1,
+                                    scale: 8,
+                                    strokeColor:
+                                        '#ffffff',
+                                    strokeWeight: 2
                                 }
                             }
                         );
 
+                    // Adiciona o marcador para o ponto de destino
                     if (
                         destinationMarkerRef.current
                     ) {
@@ -240,12 +252,18 @@ const GoogleMapsComponent = () => {
                                 map: mapInstanceRef.current,
                                 title: 'Destination',
                                 icon: {
-                                    url: 'https://img.icons8.com/fluency/48/000000/finish-flag.png',
-                                    scaledSize:
-                                        new window.google.maps.Size(
-                                            40,
-                                            40
-                                        )
+                                    path: window
+                                        .google
+                                        .maps
+                                        .SymbolPath
+                                        .CIRCLE, // Marcador quadrado pequeno
+                                    fillColor:
+                                        '#dc3545',
+                                    fillOpacity: 1,
+                                    scale: 8,
+                                    strokeColor:
+                                        '#ffffff',
+                                    strokeWeight: 2
                                 }
                             }
                         );
@@ -262,6 +280,7 @@ const GoogleMapsComponent = () => {
         );
     }, [destination, userPosition]);
 
+    // Função para iniciar a navegação
     const startNavigation = () => {
         if (directions.length === 0) {
             alert(
@@ -270,7 +289,7 @@ const GoogleMapsComponent = () => {
             return;
         }
 
-        setIsNavigationActive(true); // Ativa a navegação
+        setIsNavigationActive(true);
         setCurrentStepIndex(0);
         setCurrentInstruction(
             directions[0]?.instructions.replace(
@@ -349,8 +368,9 @@ const GoogleMapsComponent = () => {
         };
     };
 
+    // Função para cancelar a navegação
     const cancelNavigation = () => {
-        setIsNavigationActive(false); // Desativa a navegação
+        setIsNavigationActive(false);
         setCurrentInstruction('');
         setDirections([]);
         setTravelTime('');
@@ -373,6 +393,7 @@ const GoogleMapsComponent = () => {
         }
     };
 
+    // Efeito para falar a instrução atual
     useEffect(() => {
         if (currentInstruction) {
             const synth = window.speechSynthesis;
@@ -384,6 +405,7 @@ const GoogleMapsComponent = () => {
         }
     }, [currentInstruction]);
 
+    // Efeito para carregar o mapa e a posição do usuário
     useEffect(() => {
         const loadMap = async () => {
             try {
@@ -533,7 +555,7 @@ const GoogleMapsComponent = () => {
                     style={{
                         marginTop: '20px',
                         padding: '10px',
-                        color:"#333",
+                        color: '#333',
                         backgroundColor:
                             '#f8f9fa',
                         border: '1px solid #ccc',
