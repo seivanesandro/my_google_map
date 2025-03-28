@@ -5,48 +5,47 @@ import React, {
     useCallback
 } from 'react';
 
-// Componente principal do Google Maps
 const GoogleMapsComponent = () => {
-    // Referências para o mapa e serviços do Google Maps
-    const mapRef = useRef(null); // Referência para o elemento DOM onde o mapa será renderizado
-    const mapInstanceRef = useRef(null); // Instância do mapa
-    const userMarkerRef = useRef(null); // Marcador da posição do usuário
-    const directionsServiceRef = useRef(null); // Serviço de rotas do Google Maps
-    const directionsRendererRef = useRef(null); // Renderizador de rotas do Google Maps
+    const mapRef = useRef(null);
+    const mapInstanceRef = useRef(null);
+    const userMarkerRef = useRef(null);
+    const originMarkerRef = useRef(null);
+    const destinationMarkerRef = useRef(null);
+    const directionsServiceRef = useRef(null);
+    const directionsRendererRef = useRef(null);
 
-    // Estados para armazenar informações do usuário e da navegação
     const [userPosition, setUserPosition] =
-        useState(null); // Posição atual do usuário
+        useState(null);
     const [destination, setDestination] =
-        useState(''); // Destino inserido pelo usuário
+        useState('');
     const [directions, setDirections] = useState(
         []
-    ); // Lista de direções (passos da rota)
+    );
     const [travelTime, setTravelTime] =
-        useState(''); // Tempo estimado de viagem
-    const [
-        isNavigationActive,
-        setIsNavigationActive
-    ] = useState(false); // Indica se a navegação está ativa
+        useState('');
     const [
         currentStepIndex,
         setCurrentStepIndex
-    ] = useState(0); // Índice do passo atual da rota
+    ] = useState(0);
     const [
         currentInstruction,
         setCurrentInstruction
-    ] = useState(''); // Instrução atual exibida no pop-up
+    ] = useState('');
+    const [
+        isNavigationActive,
+        setIsNavigationActive
+    ] = useState(false); // Estado para controlar a navegação
 
     const apiGoogleMapKey =
-        process.env.REACT_APP_GOOGLE_MAPS_API_KEY; // Chave da API do Google Maps
+        process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
-    // Função para carregar o script do Google Maps
-    const loadGoogleMapsScript = useCallback(() => {
+    const loadGoogleMapsScript =
+        useCallback(() => {
             if (
                 window.google &&
                 window.google.maps
             ) {
-                return Promise.resolve(); // Se o script já estiver carregado, resolve imediatamente
+                return Promise.resolve();
             }
 
             return new Promise(
@@ -56,19 +55,18 @@ const GoogleMapsComponent = () => {
                             `script[src*="maps.googleapis.com"]`
                         );
                     if (existingScript) {
-                        resolve(); // Se o script já existir no DOM, resolve imediatamente
+                        resolve();
                         return;
                     }
 
-                    // Cria e adiciona o script do Google Maps ao DOM
                     const script =
                         document.createElement(
                             'script'
                         );
                     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiGoogleMapKey}&libraries=places`;
-                    script.defer = true; // Carrega o script de forma assíncrona
-                    script.onload = resolve; // Resolve a promessa quando o script for carregado
-                    script.onerror = reject; // Rejeita a promessa se houver erro ao carregar o script
+                    script.defer = true;
+                    script.onload = resolve;
+                    script.onerror = reject;
                     document.head.appendChild(
                         script
                     );
@@ -76,66 +74,80 @@ const GoogleMapsComponent = () => {
             );
         }, [apiGoogleMapKey]);
 
-    // Função para inicializar o mapa
     const initMap = useCallback(userLatLng => {
         if (
             window.google &&
             window.google.maps &&
             mapRef.current
         ) {
-            // Cria uma nova instância do mapa
             const map =
                 new window.google.maps.Map(
                     mapRef.current,
                     {
-                        center: userLatLng, // Centraliza o mapa na posição do usuário
-                        zoom: 18 // Define o nível de zoom inicial para mostrar as ruas
+                        center: userLatLng,
+                        zoom: 18
                     }
                 );
 
-            mapInstanceRef.current = map; // Salva a instância do mapa
+            mapInstanceRef.current = map;
 
-            // Adiciona a camada de tráfego ao mapa
             const trafficLayer =
                 new window.google.maps.TrafficLayer();
             trafficLayer.setMap(map);
 
-            // Inicializa os serviços de rotas e renderização
             directionsServiceRef.current =
                 new window.google.maps.DirectionsService();
             directionsRendererRef.current =
                 new window.google.maps.DirectionsRenderer(
                     {
-                        map: map, // Associa o renderizador ao mapa
-                        suppressMarkers: false // Exibe os marcadores padrão
+                        map: map,
+                        suppressMarkers: true,
+                        polylineOptions: {
+                            strokeColor:
+                                '#000000',
+                            strokeWeight: 6
+                        }
                     }
                 );
 
-            // Adiciona um marcador para a posição do usuário
             userMarkerRef.current =
                 new window.google.maps.Marker({
                     position: userLatLng,
                     map: map,
-                    title: 'Your Location'
+                    title: 'Your Location',
+                    icon: {
+                        url: 'https://img.icons8.com/color/48/000000/car.png',
+                        scaledSize:
+                            new window.google.maps.Size(
+                                40,
+                                40
+                            )
+                    }
                 });
         }
     }, []);
 
-    // Função para atualizar a posição do usuário no mapa
     const updateUserPosition = useCallback(
         userLatLng => {
             if (userMarkerRef.current) {
                 userMarkerRef.current.setPosition(
                     userLatLng
-                ); // Atualiza a posição do marcador
+                );
             } else {
-                // Cria um novo marcador se ele ainda não existir
                 userMarkerRef.current =
                     new window.google.maps.Marker(
                         {
                             position: userLatLng,
                             map: mapInstanceRef.current,
-                            title: 'Your Location'
+                            title: 'Your Location',
+                            icon: {
+                                url: 'https://img.icons8.com/color/48/000000/car.png',
+                                scaledSize:
+                                    new window.google.maps.Size(
+                                        40,
+                                        40
+                                    )
+                            }
                         }
                     );
             }
@@ -143,16 +155,15 @@ const GoogleMapsComponent = () => {
             if (mapInstanceRef.current) {
                 mapInstanceRef.current.setCenter(
                     userLatLng
-                ); // Centraliza o mapa na nova posição do usuário
+                );
                 mapInstanceRef.current.setZoom(
                     18
-                ); // Ajusta o zoom para mostrar as ruas
+                );
             }
         },
         []
     );
 
-    // Função para calcular a rota
     const calculateRoute = useCallback(() => {
         if (!destination || !userPosition) {
             alert(
@@ -161,34 +172,20 @@ const GoogleMapsComponent = () => {
             return;
         }
 
-        // Solicita a rota ao serviço de rotas do Google Maps
         directionsServiceRef.current.route(
             {
-                origin: userPosition, // Posição inicial
-                destination: destination, // Destino
+                origin: userPosition,
+                destination: destination,
                 travelMode:
                     window.google.maps.TravelMode
-                        .DRIVING // Modo de viagem
+                        .DRIVING
             },
             (result, status) => {
                 if (status === 'OK' && result) {
                     directionsRendererRef.current.setDirections(
                         result
-                    ); // Renderiza a rota no mapa
-
-                    // Ajusta o zoom para exibir toda a rota
-                    const bounds =
-                        new window.google.maps.LatLngBounds();
-                    result.routes[0].overview_path.forEach(
-                        point => {
-                            bounds.extend(point);
-                        }
-                    );
-                    mapInstanceRef.current.fitBounds(
-                        bounds
                     );
 
-                    // Extrai os passos da rota e o tempo estimado de viagem
                     const steps =
                         result.routes[0].legs[0]
                             .steps;
@@ -196,8 +193,62 @@ const GoogleMapsComponent = () => {
                         result.routes[0].legs[0]
                             .duration.text;
 
-                    setDirections(steps); // Salva os passos da rota no estado
-                    setTravelTime(duration); // Salva o tempo estimado de viagem no estado
+                    setDirections(steps);
+                    setTravelTime(duration);
+
+                    if (originMarkerRef.current) {
+                        originMarkerRef.current.setMap(
+                            null
+                        );
+                    }
+                    originMarkerRef.current =
+                        new window.google.maps.Marker(
+                            {
+                                position:
+                                    result
+                                        .routes[0]
+                                        .legs[0]
+                                        .start_location,
+                                map: mapInstanceRef.current,
+                                title: 'Start Point',
+                                icon: {
+                                    url: 'https://img.icons8.com/fluency/48/000000/marker.png',
+                                    scaledSize:
+                                        new window.google.maps.Size(
+                                            40,
+                                            40
+                                        )
+                                }
+                            }
+                        );
+
+                    if (
+                        destinationMarkerRef.current
+                    ) {
+                        destinationMarkerRef.current.setMap(
+                            null
+                        );
+                    }
+                    destinationMarkerRef.current =
+                        new window.google.maps.Marker(
+                            {
+                                position:
+                                    result
+                                        .routes[0]
+                                        .legs[0]
+                                        .end_location,
+                                map: mapInstanceRef.current,
+                                title: 'Destination',
+                                icon: {
+                                    url: 'https://img.icons8.com/fluency/48/000000/finish-flag.png',
+                                    scaledSize:
+                                        new window.google.maps.Size(
+                                            40,
+                                            40
+                                        )
+                                }
+                            }
+                        );
                 } else {
                     console.error(
                         'Error calculating route:',
@@ -211,7 +262,6 @@ const GoogleMapsComponent = () => {
         );
     }, [destination, userPosition]);
 
-    // Função para iniciar a navegação
     const startNavigation = () => {
         if (directions.length === 0) {
             alert(
@@ -220,16 +270,17 @@ const GoogleMapsComponent = () => {
             return;
         }
 
-        setIsNavigationActive(true); // Ativa o estado de navegação
-        setCurrentStepIndex(0); // Reinicia o índice do passo atual
+        setIsNavigationActive(true); // Ativa a navegação
+        setCurrentStepIndex(0);
         setCurrentInstruction(
             directions[0]?.instructions.replace(
                 /<[^>]*>/g,
                 ''
             )
-        ); // Exibe a primeira instrução
+        );
 
-        const watchId = navigator.geolocation.watchPosition(
+        const watchId =
+            navigator.geolocation.watchPosition(
                 position => {
                     const userLatLng = {
                         lat: position.coords
@@ -237,10 +288,10 @@ const GoogleMapsComponent = () => {
                         lng: position.coords
                             .longitude
                     };
-                    setUserPosition(userLatLng); // Atualiza a posição do usuário
+                    setUserPosition(userLatLng);
                     updateUserPosition(
                         userLatLng
-                    ); // Atualiza o marcador no mapa
+                    );
 
                     if (
                         currentStepIndex <
@@ -271,11 +322,11 @@ const GoogleMapsComponent = () => {
                                     /<[^>]*>/g,
                                     ''
                                 )
-                            ); // Atualiza a instrução atual
+                            );
                             setCurrentStepIndex(
                                 prevIndex =>
                                     prevIndex + 1
-                            ); // Avança para o próximo passo
+                            );
                         }
                     }
                 },
@@ -294,45 +345,49 @@ const GoogleMapsComponent = () => {
         return () => {
             navigator.geolocation.clearWatch(
                 watchId
-            ); // Para de monitorar a posição do usuário
-            setIsNavigationActive(false); // Desativa o estado de navegação
+            );
         };
     };
 
-    // Função para cancelar a navegação
     const cancelNavigation = () => {
-        setIsNavigationActive(false); // Desativa o estado de navegação
-        setCurrentInstruction(''); // Remove a instrução atual
-        setDirections([]); // Remove as direções
-        setTravelTime(''); // Limpa o tempo estimado de viagem
-        setDestination(''); // Limpa o destino
+        setIsNavigationActive(false); // Desativa a navegação
+        setCurrentInstruction('');
+        setDirections([]);
+        setTravelTime('');
+        setDestination('');
         if (directionsRendererRef.current) {
             directionsRendererRef.current.setDirections(
                 { routes: [] }
-            ); // Remove a rota do mapa
+            );
+        }
+        if (originMarkerRef.current) {
+            originMarkerRef.current.setMap(null);
+        }
+        if (destinationMarkerRef.current) {
+            destinationMarkerRef.current.setMap(
+                null
+            );
         }
         if (window.speechSynthesis) {
-            window.speechSynthesis.cancel(); // Cancela qualquer narração em andamento
+            window.speechSynthesis.cancel();
         }
     };
 
-    // Sincroniza as instruções de voz com os pop-ups
     useEffect(() => {
         if (currentInstruction) {
             const synth = window.speechSynthesis;
             const utterance =
                 new SpeechSynthesisUtterance(
                     currentInstruction
-                ); // Cria uma narração para a instrução atual
-            synth.speak(utterance); // Narra a instrução
+                );
+            synth.speak(utterance);
         }
-    }, [currentInstruction]); // Executa sempre que `currentInstruction` for atualizado
+    }, [currentInstruction]);
 
-    // Carrega o mapa ao montar o componente
     useEffect(() => {
         const loadMap = async () => {
             try {
-                await loadGoogleMapsScript(); // Carrega o script do Google Maps
+                await loadGoogleMapsScript();
 
                 navigator.geolocation.getCurrentPosition(
                     position => {
@@ -344,8 +399,8 @@ const GoogleMapsComponent = () => {
                         };
                         setUserPosition(
                             userLatLng
-                        ); // Salva a posição inicial do usuário
-                        initMap(userLatLng); // Inicializa o mapa
+                        );
+                        initMap(userLatLng);
                     },
                     error => {
                         console.error(
@@ -375,7 +430,7 @@ const GoogleMapsComponent = () => {
             if (directionsRendererRef.current) {
                 directionsRendererRef.current.setMap(
                     null
-                ); // Remove o renderizador de rotas ao desmontar o componente
+                );
             }
         };
     }, [loadGoogleMapsScript, initMap]);
@@ -391,7 +446,7 @@ const GoogleMapsComponent = () => {
                         setDestination(
                             e.target.value
                         )
-                    } // Atualiza o destino inserido pelo usuário
+                    }
                     style={{
                         width: '300px',
                         padding: '10px',
@@ -401,7 +456,7 @@ const GoogleMapsComponent = () => {
                     }}
                 />
                 <button
-                    onClick={calculateRoute} // Calcula a rota ao clicar no botão
+                    onClick={calculateRoute}
                     style={{
                         padding: '10px 20px',
                         backgroundColor:
@@ -419,7 +474,7 @@ const GoogleMapsComponent = () => {
                         <button
                             onClick={
                                 startNavigation
-                            } // Inicia a navegação ao clicar no botão
+                            }
                             style={{
                                 padding:
                                     '10px 20px',
@@ -438,7 +493,7 @@ const GoogleMapsComponent = () => {
                     )}
                 {isNavigationActive && (
                     <button
-                        onClick={cancelNavigation} // Cancela a navegação ao clicar no botão
+                        onClick={cancelNavigation}
                         style={{
                             padding: '10px 20px',
                             backgroundColor:
@@ -455,7 +510,7 @@ const GoogleMapsComponent = () => {
                 )}
             </div>
             <div
-                ref={mapRef} // Referência para o elemento DOM onde o mapa será renderizado
+                ref={mapRef}
                 style={{
                     width: '100%',
                     height: '500px',
@@ -470,8 +525,7 @@ const GoogleMapsComponent = () => {
                     <h3>
                         Estimated Travel Time:{' '}
                         {travelTime}
-                    </h3>{' '}
-                    {/* Exibe o tempo estimado de viagem */}
+                    </h3>
                 </div>
             )}
             {currentInstruction && (
@@ -479,6 +533,7 @@ const GoogleMapsComponent = () => {
                     style={{
                         marginTop: '20px',
                         padding: '10px',
+                        color:"#333",
                         backgroundColor:
                             '#f8f9fa',
                         border: '1px solid #ccc',
@@ -486,14 +541,11 @@ const GoogleMapsComponent = () => {
                     }}
                 >
                     <h4>Current Instruction:</h4>
-                    <p>
-                        {currentInstruction}
-                    </p>{' '}
-                    {/* Exibe a instrução atual no pop-up */}
+                    <p>{currentInstruction}</p>
                 </div>
             )}
         </div>
     );
 };
 
-export default GoogleMapsComponent; // Exporta o componente para ser usado em outros arquivos
+export default GoogleMapsComponent;
