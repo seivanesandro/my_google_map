@@ -6,38 +6,39 @@ import React, {
 } from 'react';
 
 const GoogleMapsComponent = () => {
-    const mapRef = useRef(null); // Referência para o elemento DOM onde o mapa será renderizado
-    const mapInstanceRef = useRef(null); // Instância do mapa
-    const userMarkerRef = useRef(null); // Marcador da posição do usuário
-    const originMarkerRef = useRef(null); // Marcador para o ponto de origem
-    const destinationMarkerRef = useRef(null); // Marcador para o ponto de destino
-    const directionsServiceRef = useRef(null); // Serviço de rotas do Google Maps
-    const directionsRendererRef = useRef(null); // Renderizador de rotas do Google Maps
+    const mapRef = useRef(null);
+    const mapInstanceRef = useRef(null);
+    const userMarkerRef = useRef(null);
+    const originMarkerRef = useRef(null);
+    const destinationMarkerRef = useRef(null);
+    const directionsServiceRef = useRef(null);
+    const directionsRendererRef = useRef(null);
+    const watchIdRef = useRef(null); // Para armazenar o ID do watchPosition
 
     const [userPosition, setUserPosition] =
-        useState(null); // Posição atual do usuário
+        useState(null);
     const [destination, setDestination] =
-        useState(''); // Destino inserido pelo usuário
+        useState('');
     const [directions, setDirections] = useState(
         []
-    ); // Lista de direções (passos da rota)
+    );
     const [travelTime, setTravelTime] =
-        useState(''); // Tempo estimado de viagem
+        useState('');
     const [
         currentStepIndex,
         setCurrentStepIndex
-    ] = useState(0); // Índice do passo atual da rota
+    ] = useState(0);
     const [
         currentInstruction,
         setCurrentInstruction
-    ] = useState(''); // Instrução atual exibida no pop-up
+    ] = useState('');
     const [
         isNavigationActive,
         setIsNavigationActive
-    ] = useState(false); // Estado para controlar a navegação
+    ] = useState(false);
 
     const apiGoogleMapKey =
-        process.env.REACT_APP_GOOGLE_MAPS_API_KEY; // Chave da API do Google Maps
+        process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
     // Função para carregar o script do Google Maps
     const loadGoogleMapsScript =
@@ -118,7 +119,7 @@ const GoogleMapsComponent = () => {
                     map: map,
                     title: 'Your Location',
                     icon: {
-                        url: 'https://img.icons8.com/color/48/000000/car.png', // Ícone de carro
+                        url: 'https://img.icons8.com/color/48/000000/car.png',
                         scaledSize:
                             new window.google.maps.Size(
                                 40,
@@ -144,7 +145,7 @@ const GoogleMapsComponent = () => {
                             map: mapInstanceRef.current,
                             title: 'Your Location',
                             icon: {
-                                url: 'https://img.icons8.com/color/48/000000/car.png', // Ícone de carro
+                                url: 'https://img.icons8.com/color/48/000000/car.png',
                                 scaledSize:
                                     new window.google.maps.Size(
                                         40,
@@ -221,7 +222,7 @@ const GoogleMapsComponent = () => {
                                         .google
                                         .maps
                                         .SymbolPath
-                                        .CIRCLE, // Marcador quadrado pequeno
+                                        .CIRCLE,
                                     fillColor:
                                         '#007bff',
                                     fillOpacity: 1,
@@ -256,7 +257,7 @@ const GoogleMapsComponent = () => {
                                         .google
                                         .maps
                                         .SymbolPath
-                                        .CIRCLE, // Marcador quadrado pequeno
+                                        .CIRCLE,
                                     fillColor:
                                         '#dc3545',
                                     fillOpacity: 1,
@@ -282,6 +283,7 @@ const GoogleMapsComponent = () => {
 
     // Função para iniciar a navegação
     const startNavigation = () => {
+        // Verifica se a rota foi calculada antes de iniciar a navegação
         if (directions.length === 0) {
             alert(
                 'Please calculate a route first.'
@@ -289,16 +291,22 @@ const GoogleMapsComponent = () => {
             return;
         }
 
+        // Ativa o estado de navegação
         setIsNavigationActive(true);
+
+        // Define o índice do passo atual como o primeiro passo
         setCurrentStepIndex(0);
+
+        // Define a primeira instrução da rota
         setCurrentInstruction(
             directions[0]?.instructions.replace(
                 /<[^>]*>/g,
                 ''
-            )
+            ) // Remove tags HTML das instruções
         );
 
-        const watchId =
+        // Inicia o monitoramento da posição do usuário em tempo real
+        watchIdRef.current =
             navigator.geolocation.watchPosition(
                 position => {
                     const userLatLng = {
@@ -307,11 +315,14 @@ const GoogleMapsComponent = () => {
                         lng: position.coords
                             .longitude
                     };
+
+                    // Atualiza a posição do usuário no estado e no mapa
                     setUserPosition(userLatLng);
                     updateUserPosition(
                         userLatLng
                     );
 
+                    // Verifica se o usuário ainda está seguindo a rota
                     if (
                         currentStepIndex <
                         directions.length
@@ -326,6 +337,7 @@ const GoogleMapsComponent = () => {
                                 nextStep.end_location.lng
                             );
 
+                        // Calcula a distância entre a posição atual do usuário e o próximo ponto da rota
                         const distance =
                             window.google.maps.geometry.spherical.computeDistanceBetween(
                                 new window.google.maps.LatLng(
@@ -335,6 +347,7 @@ const GoogleMapsComponent = () => {
                                 stepLatLng
                             );
 
+                        // Se o usuário estiver próximo do próximo ponto, atualiza a instrução e o índice
                         if (distance < 50) {
                             setCurrentInstruction(
                                 nextStep.instructions.replace(
@@ -346,6 +359,61 @@ const GoogleMapsComponent = () => {
                                 prevIndex =>
                                     prevIndex + 1
                             );
+
+                            // Recalcula o trajeto e o tempo de viagem em tempo real
+                            directionsServiceRef.current.route(
+                                {
+                                    origin: userLatLng, // Posição atual do usuário
+                                    destination:
+                                        destination, // Destino final
+                                    travelMode:
+                                        window
+                                            .google
+                                            .maps
+                                            .TravelMode
+                                            .DRIVING
+                                },
+                                (
+                                    result,
+                                    status
+                                ) => {
+                                    if (
+                                        status ===
+                                            'OK' &&
+                                        result
+                                    ) {
+                                        // Atualiza o trajeto no mapa
+                                        directionsRendererRef.current.setDirections(
+                                            result
+                                        );
+
+                                        // Atualiza os passos e o tempo estimado de viagem
+                                        const updatedSteps =
+                                            result
+                                                .routes[0]
+                                                .legs[0]
+                                                .steps;
+                                        const updatedDuration =
+                                            result
+                                                .routes[0]
+                                                .legs[0]
+                                                .duration
+                                                .text;
+
+                                        setDirections(
+                                            updatedSteps
+                                        );
+                                        setTravelTime(
+                                            updatedDuration
+                                        );
+                                    } else {
+                                        console.error(
+                                            'Error recalculating route:',
+                                            status
+                                        );
+                                    }
+                                }
+                            );
                         }
                     }
                 },
@@ -356,30 +424,31 @@ const GoogleMapsComponent = () => {
                     );
                 },
                 {
-                    enableHighAccuracy: true,
-                    maximumAge: 0
+                    enableHighAccuracy: true, // Garante maior precisão na localização
+                    maximumAge: 0 // Não utiliza cache para a localização
                 }
             );
-
-        return () => {
-            navigator.geolocation.clearWatch(
-                watchId
-            );
-        };
     };
 
     // Função para cancelar a navegação
     const cancelNavigation = () => {
+        // Desativa o estado de navegação
         setIsNavigationActive(false);
+
+        // Limpa as instruções, rota e tempo de viagem
         setCurrentInstruction('');
         setDirections([]);
         setTravelTime('');
         setDestination('');
+
+        // Remove a rota do mapa
         if (directionsRendererRef.current) {
             directionsRendererRef.current.setDirections(
                 { routes: [] }
             );
         }
+
+        // Remove os marcadores de origem e destino
         if (originMarkerRef.current) {
             originMarkerRef.current.setMap(null);
         }
@@ -388,12 +457,21 @@ const GoogleMapsComponent = () => {
                 null
             );
         }
+
+        // Para de monitorar a posição do usuário
+        if (watchIdRef.current) {
+            navigator.geolocation.clearWatch(
+                watchIdRef.current
+            );
+        }
+
+        // Cancela qualquer narração em andamento
         if (window.speechSynthesis) {
             window.speechSynthesis.cancel();
         }
     };
 
-    // Efeito para falar a instrução atual
+    // Efeito para narrar a instrução atual
     useEffect(() => {
         if (currentInstruction) {
             const synth = window.speechSynthesis;
@@ -405,7 +483,7 @@ const GoogleMapsComponent = () => {
         }
     }, [currentInstruction]);
 
-    // Efeito para carregar o mapa e a posição do usuário
+    // Efeito para carregar o mapa ao montar o componente
     useEffect(() => {
         const loadMap = async () => {
             try {
