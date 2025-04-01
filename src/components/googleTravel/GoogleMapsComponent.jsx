@@ -367,6 +367,9 @@ const GoogleMapsComponent = () => {
                                 cancelNavigation();
                             }
                         }
+                    } else {
+                        // Adicionado: Recalcular rota se o usuário sair do trajeto
+                        calculateRoute(); // Recalcula a rota automaticamente
                     }
                 },
                 error => {
