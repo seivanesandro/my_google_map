@@ -41,8 +41,7 @@ const GoogleMapsComponent = () => {
         process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
     // Função para carregar o script do Google Maps
-    const loadGoogleMapsScript =
-        useCallback(() => {
+    const loadGoogleMapsScript = useCallback(() => {
             if (
                 window.google &&
                 window.google.maps
@@ -295,8 +294,9 @@ const GoogleMapsComponent = () => {
                 /<[^>]*>/g,
                 ''
             )
-        );
+        ); // Mostra a primeira instrução
 
+        // Inicia o rastreamento da localização em tempo real
         watchIdRef.current =
             navigator.geolocation.watchPosition(
                 position => {
@@ -326,6 +326,7 @@ const GoogleMapsComponent = () => {
                                 nextStep.end_location.lng
                             );
 
+                        // Calcula a distância entre o usuário e o próximo passo
                         const distance =
                             window.google.maps.geometry.spherical.computeDistanceBetween(
                                 new window.google.maps.LatLng(
@@ -335,41 +336,52 @@ const GoogleMapsComponent = () => {
                                 stepLatLng
                             );
 
+                        // Se o usuário estiver próximo do próximo passo, atualiza para a próxima instrução
                         if (distance < 50) {
                             setCurrentInstruction(
                                 nextStep.instructions.replace(
                                     /<[^>]*>/g,
                                     ''
                                 )
-                            );
+                            ); // Atualiza a instrução de texto
                             setCurrentStepIndex(
                                 prevIndex =>
                                     prevIndex + 1
+                            ); // Avança para o próximo passo
+
+                            // Fala a instrução de voz
+                            const synth =
+                                window.speechSynthesis;
+                            const utterance =
+                                new SpeechSynthesisUtterance(
+                                    nextStep.instructions.replace(
+                                        /<[^>]*>/g,
+                                        ''
+                                    )
+                                );
+                            synth.speak(
+                                utterance
                             );
 
+                            // Se for o último passo, exibe a mensagem final
                             if (
                                 currentStepIndex ===
                                 directions.length -
                                     1
                             ) {
                                 setCurrentInstruction(
-                                    'Chegou ao seu destino.'
+                                    'Parabéns! Chegou ao seu destino sem problemas!'
                                 );
-                                const synth =
-                                    window.speechSynthesis;
-                                const utterance =
+                                const finalUtterance =
                                     new SpeechSynthesisUtterance(
-                                        'Chegou ao seu destino.'
+                                        'Parabéns! Chegou ao seu destino sem problemas!'
                                     );
                                 synth.speak(
-                                    utterance
+                                    finalUtterance
                                 );
-                                cancelNavigation();
+                                cancelNavigation(); // Finaliza a navegação
                             }
                         }
-                    } else {
-                        // Adicionado: Recalcular rota se o usuário sair do trajeto
-                        calculateRoute(); // Recalcula a rota automaticamente
                     }
                 },
                 error => {
@@ -435,33 +447,46 @@ const GoogleMapsComponent = () => {
             try {
                 await loadGoogleMapsScript();
 
-                navigator.geolocation.getCurrentPosition(
-                    position => {
-                        const userLatLng = {
-                            lat: position.coords
-                                .latitude,
-                            lng: position.coords
-                                .longitude
-                        };
-                        setUserPosition(
-                            userLatLng
-                        );
-                        initMap(userLatLng);
-                    },
-                    error => {
-                        console.error(
-                            'Error getting user location:',
-                            error
-                        );
-                        alert(
-                            'Unable to retrieve your location. Please enable location services.'
-                        );
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        maximumAge: 0
-                    }
-                );
+                // Inicia o rastreamento da localização em tempo real
+                watchIdRef.current =
+                    navigator.geolocation.watchPosition(
+                        position => {
+                            const userLatLng = {
+                                lat: position
+                                    .coords
+                                    .latitude,
+                                lng: position
+                                    .coords
+                                    .longitude
+                            };
+                            setUserPosition(
+                                userLatLng
+                            ); // Atualiza o estado da posição do usuário
+                            updateUserPosition(
+                                userLatLng
+                            ); // Atualiza o marcador no mapa
+                            if (
+                                !mapInstanceRef.current
+                            ) {
+                                initMap(
+                                    userLatLng
+                                ); // Inicializa o mapa na primeira localização
+                            }
+                        },
+                        error => {
+                            console.error(
+                                'Error watching user location:',
+                                error
+                            );
+                            alert(
+                                'Unable to retrieve your location. Please enable location services.'
+                            );
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            maximumAge: 0
+                        }
+                    );
             } catch (error) {
                 console.error(
                     'Error loading Google Maps script:',
@@ -473,13 +498,17 @@ const GoogleMapsComponent = () => {
         loadMap();
 
         return () => {
-            if (directionsRendererRef.current) {
-                directionsRendererRef.current.setMap(
-                    null
-                );
+            if (watchIdRef.current) {
+                navigator.geolocation.clearWatch(
+                    watchIdRef.current
+                ); // Para o rastreamento ao desmontar o componente
             }
         };
-    }, [loadGoogleMapsScript, initMap]);
+    }, [
+        loadGoogleMapsScript,
+        initMap,
+        updateUserPosition
+    ]);
 
     return (
         <div style={{ padding: '20px' }}>
