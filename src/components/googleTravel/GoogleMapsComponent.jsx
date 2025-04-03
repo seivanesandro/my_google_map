@@ -296,6 +296,17 @@ const GoogleMapsComponent = () => {
             )
         ); // Mostra a primeira instrução
 
+        // Fala a primeira instrução
+        const synth = window.speechSynthesis;
+        const firstUtterance =
+            new SpeechSynthesisUtterance(
+                directions[0]?.instructions.replace(
+                    /<[^>]*>/g,
+                    ''
+                )
+            );
+        synth.speak(firstUtterance);
+
         // Inicia o rastreamento da localização em tempo real
         watchIdRef.current =
             navigator.geolocation.watchPosition(
@@ -350,9 +361,7 @@ const GoogleMapsComponent = () => {
                             ); // Avança para o próximo passo
 
                             // Fala a instrução de voz
-                            const synth =
-                                window.speechSynthesis;
-                            const utterance =
+                            const nextUtterance =
                                 new SpeechSynthesisUtterance(
                                     nextStep.instructions.replace(
                                         /<[^>]*>/g,
@@ -360,7 +369,7 @@ const GoogleMapsComponent = () => {
                                     )
                                 );
                             synth.speak(
-                                utterance
+                                nextUtterance
                             );
 
                             // Se for o último passo, exibe a mensagem final
@@ -382,6 +391,36 @@ const GoogleMapsComponent = () => {
                                 cancelNavigation(); // Finaliza a navegação
                             }
                         }
+                    } else {
+                        // Verifica se o usuário saiu do trajeto e recalcula a rota
+                        const routePolyline =
+                            new window.google.maps.Polyline(
+                                {
+                                    path: directions.map(
+                                        step =>
+                                            step.end_location
+                                    )
+                                }
+                            );
+
+                        const isOnRoute =
+                            window.google.maps.geometry.poly.isLocationOnEdge(
+                                new window.google.maps.LatLng(
+                                    userLatLng.lat,
+                                    userLatLng.lng
+                                ),
+                                routePolyline,
+                                0.0001 // Tolerância em graus (~11 metros)
+                            );
+
+                        if (!isOnRoute) {
+                            console.log(
+                                'Usuário saiu do trajeto. Recalculando a rota...'
+                            );
+                            recalculateRoute(
+                                userLatLng
+                            );
+                        }
                     }
                 },
                 error => {
@@ -395,6 +434,64 @@ const GoogleMapsComponent = () => {
                     maximumAge: 0
                 }
             );
+    };
+
+    // Função para recalcular a rota
+    const recalculateRoute = userLatLng => {
+        directionsServiceRef.current.route(
+            {
+                origin: userLatLng,
+                destination: destination,
+                travelMode:
+                    window.google.maps.TravelMode
+                        .DRIVING
+            },
+            (result, status) => {
+                if (status === 'OK' && result) {
+                    directionsRendererRef.current.setDirections(
+                        result
+                    );
+
+                    const steps =
+                        result.routes[0].legs[0]
+                            .steps;
+                    const duration =
+                        result.routes[0].legs[0]
+                            .duration.text;
+
+                    setDirections(steps);
+                    setTravelTime(duration);
+
+                    setCurrentStepIndex(0); // Reinicia a navegação
+                    setCurrentInstruction(
+                        steps[0]?.instructions.replace(
+                            /<[^>]*>/g,
+                            ''
+                        )
+                    ); // Mostra a primeira instrução da nova rota
+
+                    // Fala a nova instrução inicial
+                    const synth =
+                        window.speechSynthesis;
+                    const utterance =
+                        new SpeechSynthesisUtterance(
+                            steps[0]?.instructions.replace(
+                                /<[^>]*>/g,
+                                ''
+                            )
+                        );
+                    synth.speak(utterance);
+                } else {
+                    console.error(
+                        'Error recalculating route:',
+                        status
+                    );
+                    alert(
+                        'Unable to recalculate route. Please check your connection or destination.'
+                    );
+                }
+            }
+        );
     };
 
     // Função para cancelar a navegação
