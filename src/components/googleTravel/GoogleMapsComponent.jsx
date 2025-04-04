@@ -41,7 +41,8 @@ const GoogleMapsComponent = () => {
         process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
     // Função para carregar o script do Google Maps
-    const loadGoogleMapsScript = useCallback(() => {
+    const loadGoogleMapsScript =
+        useCallback(() => {
             if (
                 window.google &&
                 window.google.maps
@@ -278,7 +279,7 @@ const GoogleMapsComponent = () => {
         );
     }, [destination, userPosition]);
 
-    // Função para iniciar a navegação
+    // Função para iniciar a navegação com atualização em tempo real
     const startNavigation = () => {
         if (directions.length === 0) {
             alert(
@@ -436,7 +437,7 @@ const GoogleMapsComponent = () => {
             );
     };
 
-    // Função para recalcular a rota
+    // Função para recalcular a rota automaticamente
     const recalculateRoute = userLatLng => {
         directionsServiceRef.current.route(
             {
