@@ -279,6 +279,65 @@ const GoogleMapsComponent = () => {
         );
     }, [destination, userPosition]);
 
+    // Função para recalcular a rota automaticamente
+    const recalculateRoute = userLatLng => {
+        directionsServiceRef.current.route(
+            {
+                origin: userLatLng,
+                destination: destination,
+                travelMode:
+                    window.google.maps.TravelMode
+                        .DRIVING
+            },
+            (result, status) => {
+                if (status === 'OK' && result) {
+                    directionsRendererRef.current.setDirections(
+                        result
+                    );
+
+                    const steps =
+                        result.routes[0].legs[0]
+                            .steps;
+                    const duration =
+                        result.routes[0].legs[0]
+                            .duration.text;
+
+                    setDirections(steps);
+                    setTravelTime(duration);
+
+                    // Reinicia a navegação com a nova rota
+                    setCurrentStepIndex(0);
+                    setCurrentInstruction(
+                        steps[0]?.instructions.replace(
+                            /<[^>]*>/g,
+                            ''
+                        )
+                    );
+
+                    // Fala a nova instrução inicial
+                    const synth =
+                        window.speechSynthesis;
+                    const utterance =
+                        new SpeechSynthesisUtterance(
+                            steps[0]?.instructions.replace(
+                                /<[^>]*>/g,
+                                ''
+                            )
+                        );
+                    synth.speak(utterance);
+                } else {
+                    console.error(
+                        'Error recalculating route:',
+                        status
+                    );
+                    alert(
+                        'Unable to recalculate route. Please check your connection or destination.'
+                    );
+                }
+            }
+        );
+    };
+
     // Função para iniciar a navegação com atualização em tempo real
     const startNavigation = () => {
         if (directions.length === 0) {
@@ -295,7 +354,7 @@ const GoogleMapsComponent = () => {
                 /<[^>]*>/g,
                 ''
             )
-        ); // Mostra a primeira instrução
+        );
 
         // Fala a primeira instrução
         const synth = window.speechSynthesis;
@@ -355,11 +414,11 @@ const GoogleMapsComponent = () => {
                                     /<[^>]*>/g,
                                     ''
                                 )
-                            ); // Atualiza a instrução de texto
+                            );
                             setCurrentStepIndex(
                                 prevIndex =>
                                     prevIndex + 1
-                            ); // Avança para o próximo passo
+                            );
 
                             // Fala a instrução de voz
                             const nextUtterance =
@@ -389,7 +448,7 @@ const GoogleMapsComponent = () => {
                                 synth.speak(
                                     finalUtterance
                                 );
-                                cancelNavigation(); // Finaliza a navegação
+                                cancelNavigation();
                             }
                         }
                     } else {
@@ -435,64 +494,6 @@ const GoogleMapsComponent = () => {
                     maximumAge: 0
                 }
             );
-    };
-
-    // Função para recalcular a rota automaticamente
-    const recalculateRoute = userLatLng => {
-        directionsServiceRef.current.route(
-            {
-                origin: userLatLng,
-                destination: destination,
-                travelMode:
-                    window.google.maps.TravelMode
-                        .DRIVING
-            },
-            (result, status) => {
-                if (status === 'OK' && result) {
-                    directionsRendererRef.current.setDirections(
-                        result
-                    );
-
-                    const steps =
-                        result.routes[0].legs[0]
-                            .steps;
-                    const duration =
-                        result.routes[0].legs[0]
-                            .duration.text;
-
-                    setDirections(steps);
-                    setTravelTime(duration);
-
-                    setCurrentStepIndex(0); // Reinicia a navegação
-                    setCurrentInstruction(
-                        steps[0]?.instructions.replace(
-                            /<[^>]*>/g,
-                            ''
-                        )
-                    ); // Mostra a primeira instrução da nova rota
-
-                    // Fala a nova instrução inicial
-                    const synth =
-                        window.speechSynthesis;
-                    const utterance =
-                        new SpeechSynthesisUtterance(
-                            steps[0]?.instructions.replace(
-                                /<[^>]*>/g,
-                                ''
-                            )
-                        );
-                    synth.speak(utterance);
-                } else {
-                    console.error(
-                        'Error recalculating route:',
-                        status
-                    );
-                    alert(
-                        'Unable to recalculate route. Please check your connection or destination.'
-                    );
-                }
-            }
-        );
     };
 
     // Função para cancelar a navegação
