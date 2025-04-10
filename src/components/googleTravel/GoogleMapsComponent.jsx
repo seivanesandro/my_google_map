@@ -41,8 +41,7 @@ const GoogleMapsComponent = () => {
         process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
     // Função para carregar o script do Google Maps
-    const loadGoogleMapsScript =
-        useCallback(() => {
+    const loadGoogleMapsScript = useCallback(() => {
             if (
                 window.google &&
                 window.google.maps
@@ -283,35 +282,35 @@ const GoogleMapsComponent = () => {
     const recalculateRoute = userLatLng => {
         directionsServiceRef.current.route(
             {
-                origin: userLatLng,
-                destination: destination,
+                origin: userLatLng, // Origem: posição atual do usuário
+                destination: destination, // Destino: definido pelo usuário
                 travelMode:
                     window.google.maps.TravelMode
-                        .DRIVING
+                        .DRIVING // Modo de viagem
             },
             (result, status) => {
                 if (status === 'OK' && result) {
                     directionsRendererRef.current.setDirections(
                         result
-                    );
+                    ); // Atualiza a rota no mapa
 
                     const steps =
                         result.routes[0].legs[0]
-                            .steps;
+                            .steps; // Passos da nova rota
                     const duration =
                         result.routes[0].legs[0]
-                            .duration.text;
+                            .duration.text; // Tempo estimado
 
-                    setDirections(steps);
-                    setTravelTime(duration);
+                    setDirections(steps); // Atualiza os passos no estado
+                    setTravelTime(duration); // Atualiza o tempo estimado no estado
 
                     // Reinicia a navegação com a nova rota
-                    setCurrentStepIndex(0);
+                    setCurrentStepIndex(0); // Reinicia o índice do passo atual
                     setCurrentInstruction(
                         steps[0]?.instructions.replace(
                             /<[^>]*>/g,
                             ''
-                        )
+                        ) // Remove tags HTML da instrução
                     );
 
                     // Fala a nova instrução inicial
@@ -324,12 +323,12 @@ const GoogleMapsComponent = () => {
                                 ''
                             )
                         );
-                    synth.speak(utterance);
+                    synth.speak(utterance); // Fala a instrução inicial
                 } else {
                     console.error(
                         'Error recalculating route:',
                         status
-                    );
+                    ); // Log de erro
                     alert(
                         'Unable to recalculate route. Please check your connection or destination.'
                     );
@@ -343,17 +342,17 @@ const GoogleMapsComponent = () => {
         if (directions.length === 0) {
             alert(
                 'Please calculate a route first.'
-            );
+            ); // Verifica se a rota foi calculada
             return;
         }
 
-        setIsNavigationActive(true);
-        setCurrentStepIndex(0);
+        setIsNavigationActive(true); // Ativa o estado de navegação
+        setCurrentStepIndex(0); // Reinicia o índice do passo atual
         setCurrentInstruction(
             directions[0]?.instructions.replace(
                 /<[^>]*>/g,
                 ''
-            )
+            ) // Remove tags HTML da instrução inicial
         );
 
         // Fala a primeira instrução
@@ -365,7 +364,7 @@ const GoogleMapsComponent = () => {
                     ''
                 )
             );
-        synth.speak(firstUtterance);
+        synth.speak(firstUtterance); // Fala a instrução inicial
 
         // Inicia o rastreamento da localização em tempo real
         watchIdRef.current =
@@ -378,10 +377,10 @@ const GoogleMapsComponent = () => {
                             .longitude
                     };
 
-                    setUserPosition(userLatLng);
+                    setUserPosition(userLatLng); // Atualiza a posição do usuário
                     updateUserPosition(
                         userLatLng
-                    );
+                    ); // Atualiza o marcador no mapa
 
                     if (
                         currentStepIndex <
@@ -448,7 +447,7 @@ const GoogleMapsComponent = () => {
                                 synth.speak(
                                     finalUtterance
                                 );
-                                cancelNavigation();
+                                cancelNavigation(); // Finaliza a navegação
                             }
                         }
                     } else {
@@ -470,7 +469,7 @@ const GoogleMapsComponent = () => {
                                     userLatLng.lng
                                 ),
                                 routePolyline,
-                                0.0001 // Tolerância em graus (~11 metros)
+                                0.0005 // Aumenta a tolerância para dispositivos móveis (~55 metros)
                             );
 
                         if (!isOnRoute) {
@@ -479,7 +478,7 @@ const GoogleMapsComponent = () => {
                             );
                             recalculateRoute(
                                 userLatLng
-                            );
+                            ); // Recalcula a rota
                         }
                     }
                 },
@@ -487,15 +486,15 @@ const GoogleMapsComponent = () => {
                     console.error(
                         'Error watching user location:',
                         error
-                    );
+                    ); // Log de erro
                 },
                 {
-                    enableHighAccuracy: true,
-                    maximumAge: 0
+                    enableHighAccuracy: true, // Garante alta precisão
+                    maximumAge: 0, // Não usa cache de localização
+                    timeout: 10000 // Tempo limite para obter a localização
                 }
             );
     };
-
     // Função para cancelar a navegação
     const cancelNavigation = () => {
         setIsNavigationActive(false);
