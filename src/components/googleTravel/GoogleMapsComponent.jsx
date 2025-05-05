@@ -41,7 +41,8 @@ const GoogleMapsComponent = () => {
         process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
     // Função para carregar o script do Google Maps
-    const loadGoogleMapsScript = useCallback(() => {
+    const loadGoogleMapsScript =
+        useCallback(() => {
             if (
                 window.google &&
                 window.google.maps
@@ -341,30 +342,46 @@ const GoogleMapsComponent = () => {
     const startNavigation = () => {
         if (directions.length === 0) {
             alert(
-                'Please calculate a route first.'
+                'Por favor, calcule uma rota primeiro.'
             ); // Verifica se a rota foi calculada
             return;
         }
 
+        // Garante que a síntese de voz esteja disponível
+        if (!window.speechSynthesis) {
+            alert(
+                'Desculpe, a síntese de voz não é suportada neste navegador.'
+            );
+            return;
+        }
+        const synth = window.speechSynthesis;
+
         setIsNavigationActive(true); // Ativa o estado de navegação
         setCurrentStepIndex(0); // Reinicia o índice do passo atual
-        setCurrentInstruction(
+
+        // Define e fala a primeira instrução
+        const firstInstructionText =
             directions[0]?.instructions.replace(
                 /<[^>]*>/g,
                 ''
-            ) // Remove tags HTML da instrução inicial
+            ) || 'Iniciar navegação.';
+        setCurrentInstruction(
+            firstInstructionText
         );
-
-        // Fala a primeira instrução
-        const synth = window.speechSynthesis;
+        // Cancela qualquer fala anterior e fala a primeira instrução
+        synth.cancel();
         const firstUtterance =
             new SpeechSynthesisUtterance(
-                directions[0]?.instructions.replace(
-                    /<[^>]*>/g,
-                    ''
-                )
+                firstInstructionText
             );
-        synth.speak(firstUtterance); // Fala a instrução inicial
+        synth.speak(firstUtterance);
+
+        // Para qualquer watchPosition anterior antes de iniciar um novo
+        if (watchIdRef.current) {
+            navigator.geolocation.clearWatch(
+                watchIdRef.current
+            );
+        }
 
         // Inicia o rastreamento da localização em tempo real
         watchIdRef.current =
@@ -377,72 +394,142 @@ const GoogleMapsComponent = () => {
                             .longitude
                     };
 
-                    setUserPosition(userLatLng); // Atualiza a posição do usuário
+                    // Atualiza a posição do usuário no estado e no marcador do mapa
+                    setUserPosition(userLatLng);
                     updateUserPosition(
                         userLatLng
-                    ); // Atualiza o marcador no mapa
+                    );
 
+                    // Só executa a lógica de navegação se a navegação estiver ativa e houver direções
+                    if (
+                        !isNavigationActive ||
+                        directions.length === 0
+                    ) {
+                        return;
+                    }
+
+                    // --- Lógica de Verificação Off-Route (Executada em cada atualização) ---
+                    // Cria a polyline da rota completa para verificar se o usuário está nela
+                    const routePath =
+                        directions.flatMap(
+                            step =>
+                                window.google.maps.geometry.encoding.decodePath(
+                                    step.polyline
+                                        .points
+                                ) // Assumindo que 'directions' contém a polyline de cada passo
+                        );
+                    // Se não tiver a polyline por passo, use as end_locations como antes, mas é menos preciso
+                    // const routePathFallback = directions.map(step => new window.google.maps.LatLng(step.end_location.lat, step.end_location.lng));
+                    const routePolyline =
+                        new window.google.maps.Polyline(
+                            {
+                                path: routePath /* ou routePathFallback */
+                            }
+                        );
+
+                    const isOnRoute =
+                        window.google.maps.geometry.poly.isLocationOnEdge(
+                            new window.google.maps.LatLng(
+                                userLatLng.lat,
+                                userLatLng.lng
+                            ),
+                            routePolyline,
+                            0.0007 // Tolerância ligeiramente aumentada (~77 metros) - AJUSTAR CONFORME NECESSÁRIO
+                        );
+
+                    if (!isOnRoute) {
+                        console.log(
+                            'Usuário saiu do trajeto. Recalculando a rota...'
+                        );
+                        // Cancela a fala atual antes de recalcular
+                        synth.cancel();
+                        recalculateRoute(
+                            userLatLng
+                        ); // Recalcula a rota
+                        // Retorna para permitir que o recalculateRoute atualize o estado antes da próxima execução
+                        return;
+                    }
+
+                    // --- Lógica de Avanço de Passo (Só se estiver na rota) ---
                     if (
                         currentStepIndex <
                         directions.length
                     ) {
-                        const nextStep =
+                        const currentStep =
                             directions[
                                 currentStepIndex
-                            ];
-                        const stepLatLng =
+                            ]; // Passo atual
+                        const nextStepLatLng =
                             new window.google.maps.LatLng(
-                                nextStep.end_location.lat,
-                                nextStep.end_location.lng
+                                currentStep.end_location.lat,
+                                currentStep.end_location.lng
                             );
 
-                        // Calcula a distância entre o usuário e o próximo passo
-                        const distance =
+                        // Calcula a distância até o *fim* do passo atual
+                        const distanceToEndOfCurrentStep =
                             window.google.maps.geometry.spherical.computeDistanceBetween(
                                 new window.google.maps.LatLng(
                                     userLatLng.lat,
                                     userLatLng.lng
                                 ),
-                                stepLatLng
+                                nextStepLatLng
                             );
 
-                        // Se o usuário estiver próximo do próximo passo, atualiza para a próxima instrução
-                        if (distance < 50) {
-                            setCurrentInstruction(
-                                nextStep.instructions.replace(
-                                    /<[^>]*>/g,
-                                    ''
-                                )
-                            );
-                            setCurrentStepIndex(
-                                prevIndex =>
-                                    prevIndex + 1
-                            );
+                        // Condição para avançar: se estiver suficientemente perto do fim do passo atual
+                        // Aumentamos ligeiramente a distância para dar mais margem em mobile
+                        const proximityThreshold = 70; // Metros - AJUSTAR CONFORME NECESSÁRIO
 
-                            // Fala a instrução de voz
-                            const nextUtterance =
-                                new SpeechSynthesisUtterance(
-                                    nextStep.instructions.replace(
+                        if (
+                            distanceToEndOfCurrentStep <
+                            proximityThreshold
+                        ) {
+                            const nextIndex =
+                                currentStepIndex +
+                                1;
+
+                            // Verifica se ainda há um próximo passo
+                            if (
+                                nextIndex <
+                                directions.length
+                            ) {
+                                const nextInstructionText =
+                                    directions[
+                                        nextIndex
+                                    ].instructions.replace(
                                         /<[^>]*>/g,
                                         ''
-                                    )
-                                );
-                            synth.speak(
-                                nextUtterance
-                            );
+                                    ) ||
+                                    `Seguir para o próximo passo.`;
 
-                            // Se for o último passo, exibe a mensagem final
-                            if (
-                                currentStepIndex ===
-                                directions.length -
-                                    1
-                            ) {
+                                // Atualiza o estado para a próxima instrução e próximo índice
                                 setCurrentInstruction(
-                                    'Parabéns! Chegou ao seu destino sem problemas!'
+                                    nextInstructionText
                                 );
+                                setCurrentStepIndex(
+                                    nextIndex
+                                ); // Atualiza o índice
+
+                                // Cancela fala anterior e fala a nova instrução
+                                synth.cancel();
+                                const nextUtterance =
+                                    new SpeechSynthesisUtterance(
+                                        nextInstructionText
+                                    );
+                                synth.speak(
+                                    nextUtterance
+                                );
+                            } else {
+                                // Chegou ao fim do último passo
+                                const finalMessage =
+                                    'Parabéns! Chegou ao seu destino sem problemas!';
+                                setCurrentInstruction(
+                                    finalMessage
+                                );
+                                // Cancela fala anterior e fala a mensagem final
+                                synth.cancel();
                                 const finalUtterance =
                                     new SpeechSynthesisUtterance(
-                                        'Parabéns! Chegou ao seu destino sem problemas!'
+                                        finalMessage
                                     );
                                 synth.speak(
                                     finalUtterance
@@ -450,51 +537,32 @@ const GoogleMapsComponent = () => {
                                 cancelNavigation(); // Finaliza a navegação
                             }
                         }
-                    } else {
-                        // Verifica se o usuário saiu do trajeto e recalcula a rota
-                        const routePolyline =
-                            new window.google.maps.Polyline(
-                                {
-                                    path: directions.map(
-                                        step =>
-                                            step.end_location
-                                    )
-                                }
-                            );
-
-                        const isOnRoute =
-                            window.google.maps.geometry.poly.isLocationOnEdge(
-                                new window.google.maps.LatLng(
-                                    userLatLng.lat,
-                                    userLatLng.lng
-                                ),
-                                routePolyline,
-                                0.0005 // Aumenta a tolerância para dispositivos móveis (~55 metros)
-                            );
-
-                        if (!isOnRoute) {
-                            console.log(
-                                'Usuário saiu do trajeto. Recalculando a rota...'
-                            );
-                            recalculateRoute(
-                                userLatLng
-                            ); // Recalcula a rota
-                        }
+                        // Se não estiver perto o suficiente do fim do passo atual, não faz nada, espera a próxima atualização de posição
                     }
+                    // Se currentStepIndex >= directions.length, significa que já deveria ter chegado (ou está no último passo e a lógica acima tratará)
                 },
                 error => {
                     console.error(
-                        'Error watching user location:',
+                        'Erro ao observar a localização:',
                         error
-                    ); // Log de erro
+                    );
+                    // Informa o usuário sobre o erro de localização
+                    // Poderia tentar usar getCurrentPosition como fallback aqui, mas watchPosition é geralmente preferível para navegação.
+                    alert(
+                        'Erro ao obter a localização. Verifique as permissões e o sinal de GPS.'
+                    );
+                    // Considerar cancelar a navegação se o erro persistir?
+                    // cancelNavigation();
                 },
                 {
-                    enableHighAccuracy: true, // Garante alta precisão
-                    maximumAge: 0, // Não usa cache de localização
-                    timeout: 10000 // Tempo limite para obter a localização
+                    enableHighAccuracy: true, // Essencial para navegação
+                    maximumAge: 0, // Não usar cache de posição
+                    timeout: 10000 // Tempo limite para obter a posição (10 segundos)
                 }
             );
     };
+
+
     // Função para cancelar a navegação
     const cancelNavigation = () => {
         setIsNavigationActive(false);
