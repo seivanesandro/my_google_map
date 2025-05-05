@@ -41,8 +41,7 @@ const GoogleMapsComponent = () => {
         process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
     // Função para carregar o script do Google Maps
-    const loadGoogleMapsScript =
-        useCallback(() => {
+    const loadGoogleMapsScript = useCallback(() => {
             if (
                 window.google &&
                 window.google.maps
@@ -561,7 +560,6 @@ const GoogleMapsComponent = () => {
                 }
             );
     };
-
 
     // Função para cancelar a navegação
     const cancelNavigation = () => {
